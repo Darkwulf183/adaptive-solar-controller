@@ -7,6 +7,10 @@ on:
         description: "Optional: Zweig, Tag oder Commit, aus dem das Release gebaut wird (leer = main), z. B. release-0.4.6rc4"
         type: string
         default: ""
+      normal_release:
+        description: "Als normales Release (mit 'Latest') veröffentlichen, auch wenn rc/dev in der Version steht"
+        type: boolean
+        default: false
       replace:
         description: "Vorhandenes Release mit gleicher Version samt Tag löschen und neu anlegen"
         type: boolean
@@ -33,6 +37,7 @@ jobs:
             *rc*|*dev*|*a[0-9]*|*b[0-9]*) echo "pre=--prerelease" >> "$GITHUB_OUTPUT" ;;
             *) echo "pre=" >> "$GITHUB_OUTPUT" ;;
           esac
+          if [ "${{ inputs.normal_release }}" = "true" ]; then echo "pre=" >> "$GITHUB_OUTPUT"; fi
 
       - name: Vorhandenes Release prüfen
         env:
