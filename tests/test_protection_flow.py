@@ -113,6 +113,8 @@ def make(switch_state="on"):
     c._cutoff_notified = False
     c._cutoff_off = switch_confirm.SwitchOffTracker(confirm_after_s=15.0)
     c._lock_off = switch_confirm.SwitchOffTracker(confirm_after_s=15.0)
+    c._test_mode = False
+    c._test_started = 0.0
     return c
 
 
@@ -279,6 +281,74 @@ class TrackerUnit(unittest.TestCase):
         self.assertEqual(t.observe("unavailable", 20), "unavailable")
         self.assertEqual(t.observe("off", 21), "confirmed_off")
         self.assertEqual(t.observe("off", 22), "idle")
+
+class TestMode(unittest.TestCase):
+    def setUp(self):
+        self.clock = Clock()
+        self._orig = coord_mod.time.monotonic
+        coord_mod.time.monotonic = self.clock
+        NOTES.created.clear(); NOTES.dismissed.clear()
+
+    def tearDown(self): coord_mod.time.monotonic = self._orig
+
+    def cycle(self, c, v):
+        r = run(c._async_manage_cutoff(v, -8.0, 200.0))
+        self.clock.advance(10)
+        return r
+
+    def test_normal_mode_24_2_volt_is_fine(self):
+        c = make()
+        for _ in range(4): self.assertEqual(self.cycle(c, 24.2), "ok")
+        self.assertEqual(c.hass.calls, [])
+
+    def test_test_mode_trips_at_raised_cutoff(self):
+        c = make()
+        c._set_test_mode_state(True)
+        self.assertEqual(c._effective_limits(), (24.3, 24.1))
+        results = [self.cycle(c, 24.2) for _ in range(4)]
+        self.assertIn("cutoff_switch_off_sent", results)
+        self.assertEqual(c.hass.get(SWITCH).state, "off")
+
+    def test_test_mode_no_trip_above_raised_cutoff(self):
+        c = make()
+        c._set_test_mode_state(True)
+        for _ in range(5): self.assertEqual(self.cycle(c, 24.5), "ok")
+        self.assertEqual(c.hass.calls, [])
+
+    def test_stored_limits_untouched_and_restored(self):
+        c = make()
+        stored = (c.controller.state.hard_cutoff_voltage_v, c.controller.state.emergency_terminal_voltage_v)
+        c._set_test_mode_state(True)
+        self.assertEqual((c.controller.state.hard_cutoff_voltage_v, c.controller.state.emergency_terminal_voltage_v), stored)
+        c._set_test_mode_state(False)
+        self.assertEqual(c._effective_limits(), stored)
+
+    def test_toggle_clears_latch_so_each_test_starts_clean(self):
+        c = make()
+        c._set_test_mode_state(True)
+        for _ in range(4): self.cycle(c, 24.2)
+        self.assertTrue(c._cutoff_latched)
+        c._set_test_mode_state(False)
+        self.assertFalse(c._cutoff_latched)
+        self.assertFalse(c.controller.state.hard_cutoff_latched)
+
+    def test_lock_is_suspended_so_inverter_can_be_started(self):
+        c = make("on")
+        c._set_test_mode_state(True)
+        r = run(c._async_manage_full_lock("lead_full_emergency", "adaptive"))
+        self.assertEqual(r, "test_mode_lock_suspended")
+        self.assertEqual(c.hass.calls, [])
+
+    def test_fixed_output_200w_only_when_regulating(self):
+        c = make()
+        self.assertEqual(c._test_target(55, "adaptive", 400.0), 55)           # Testmodus aus
+        c._set_test_mode_state(True)
+        self.assertEqual(c._test_target(55, "adaptive", 400.0), 200)
+        self.assertEqual(c._test_target(55, "predictive", 400.0), 200)
+        self.assertEqual(c._test_target(None, "monitor", 400.0), None)        # Monitor schreibt nie
+        self.assertEqual(c._test_target(55, "adaptive", 150.0), 150)          # nie über Wechselrichter-Maximum
+        c._cutoff_latched = True
+        self.assertEqual(c._test_target(55, "adaptive", 400.0), 55)           # nach Trip keine Festleistung
 
 
 if __name__ == "__main__":

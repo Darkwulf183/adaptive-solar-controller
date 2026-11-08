@@ -15,6 +15,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         ControllerEnableSwitch(c, entry),
         FlightRecorderSwitch(c, entry),
         BatteryCalibrationSwitch(c, entry),
+        TestModeSwitch(c, entry),
     ])
 
 
@@ -54,3 +55,17 @@ class BatteryCalibrationSwitch(_BaseSwitch):
     def is_on(self): return self.coordinator.controller.state.battery_calibration_enabled
     async def async_turn_on(self, **kwargs): await self.coordinator.async_set_battery_calibration(True); self.async_write_ha_state()
     async def async_turn_off(self, **kwargs): await self.coordinator.async_set_battery_calibration(False); self.async_write_ha_state()
+
+
+class TestModeSwitch(_BaseSwitch):
+    """Testmodus: angehobene Abschaltgrenzen, feste Ausgangsleistung, FULL-Sperre ausgesetzt. Nach Neustart immer aus."""
+    _attr_name = "Test mode (raised cutoff, fixed output)"; _attr_icon = "mdi:flask-outline"
+    def __init__(self, coordinator, entry): super().__init__(coordinator, entry, "test_mode")
+    @property
+    def is_on(self): return self.coordinator._test_mode
+    @property
+    def extra_state_attributes(self):
+        from .const import TEST_CUTOFF_V, TEST_EMERGENCY_V, TEST_TARGET_W, TEST_MAX_SECONDS
+        return {"cutoff_v": TEST_CUTOFF_V, "emergency_v": TEST_EMERGENCY_V, "target_w": TEST_TARGET_W, "auto_off_hours": TEST_MAX_SECONDS // 3600}
+    async def async_turn_on(self, **kwargs): await self.coordinator.async_set_test_mode(True); self.async_write_ha_state()
+    async def async_turn_off(self, **kwargs): await self.coordinator.async_set_test_mode(False); self.async_write_ha_state()

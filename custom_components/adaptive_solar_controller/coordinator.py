@@ -46,6 +46,8 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         self._low_recovery_session = None
         self._cutoff_latched = False
         self._cutoff_off = switch_confirm.SwitchOffTracker()
+        self._test_mode = False
+        self._test_started = 0.0
         self._lock_off = switch_confirm.SwitchOffTracker()
         self._guard = UndervoltageGuard()
         self._safety_lock = asyncio.Lock()
@@ -113,6 +115,37 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         # Stored separately from config-entry options: no risk of clearing inverter switch.
         value = max(30.0, min(800.0, 30.0 + round((float(value) - 30.0) / 10.0) * 10.0))
         self.controller.state.inverter_max_power_w = value
+        await self.store.async_save(self.controller.state)
+        await self.async_request_refresh()
+
+    # ---- Testmodus: nur zur Laufzeit, nach Neustart immer aus ----
+    def _effective_limits(self) -> tuple[float, float]:
+        """(Abschaltgrenze, Notgrenze) in Volt. Im Testmodus die angehobenen Werte, ohne gespeicherte Werte zu ändern."""
+        if self._test_mode:
+            return TEST_CUTOFF_V, TEST_EMERGENCY_V
+        s = self.controller.state
+        return s.hard_cutoff_voltage_v, s.emergency_terminal_voltage_v
+
+    def _test_target(self, applied, mode, inverter_max_w: float):
+        """Im Testmodus feste Ausgangsleistung, solange ASC regeln darf (adaptive/predictive)."""
+        if not self._test_mode or self._cutoff_latched or mode not in (MODE_ADAPTIVE, MODE_PREDICTIVE):
+            return applied
+        return int(max(30, min(TEST_TARGET_W, int(inverter_max_w))))
+
+    def _set_test_mode_state(self, enabled: bool) -> None:
+        self._test_mode = bool(enabled)
+        self._test_started = time.monotonic()
+        # Jeder Test beginnt sauber: Verriegelung und Entprellung zurücksetzen.
+        self._cutoff_latched = False
+        self.controller.state.hard_cutoff_latched = False
+        self._guard.reset()
+        self._cutoff_off.reset()
+        self._lock_off.reset()
+        persistent_notification.async_dismiss(self.hass, "asc_switch_off_unconfirmed")
+        _LOGGER.warning("ASC test mode %s", "ON (cutoff %.1f V, emergency %.1f V, %d W)" % (TEST_CUTOFF_V, TEST_EMERGENCY_V, TEST_TARGET_W) if enabled else "OFF")
+
+    async def async_set_test_mode(self, enabled: bool) -> None:
+        self._set_test_mode_state(enabled)
         await self.store.async_save(self.controller.state)
         await self.async_request_refresh()
 
@@ -420,8 +453,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         """
         async with self._safety_lock:
             state = self.controller.state
-            cutoff = state.hard_cutoff_voltage_v
-            emergency_floor = state.emergency_terminal_voltage_v
+            cutoff, emergency_floor = self._effective_limits()
             invalid_voltage = battery_v is None or not math.isfinite(battery_v)
             current = battery_a if battery_a is not None and math.isfinite(battery_a) else 0.0
 
@@ -557,6 +589,8 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
 
     async def _async_manage_full_lock(self, chemistry_state: str, mode: str) -> str:
         """Own only our own switch-off, never re-enable a manually off inverter."""
+        if self._test_mode:
+            return "test_mode_lock_suspended"
         state = self.controller.state
         entity_id = self.cfg.get(CONF_INVERTER_POWER_SWITCH) or ""
         owned = bool(state.inverter_full_lock_owned)
@@ -702,6 +736,9 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
 
     async def _async_update_data(self) -> dict:
         if self.controller is None: return {"status":"initializing","blocked_reason":"initializing"}
+        if self._test_mode and time.monotonic() - self._test_started > TEST_MAX_SECONDS:
+            self._set_test_mode_state(False)
+            _LOGGER.warning("ASC test mode ended automatically after %d h", TEST_MAX_SECONDS // 3600)
         # Battery protection first: also while paused, warming up or on invalid sensors.
         critical = self._critical_inputs()
         self._last_cutoff_status = await self._async_manage_cutoff(
@@ -745,6 +782,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             # Never command more power while below the hard cutoff. A switch
             # is required to enforce a true 0 W cutoff on hardware with 30 W floor.
             applied_target = 30 if result.mode in (MODE_ADAPTIVE, MODE_PREDICTIVE) else None
+        applied_target = self._test_target(applied_target, result.mode, float(self.controller.state.inverter_max_power_w))
         if applied_target is not None:
             await self._async_set_target(applied_target, snap.target_w)
 
@@ -765,7 +803,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         data = {
             **absorption_data,
             "capacity_change_reason":capacity_change_reason,
-            "hard_cutoff_voltage_v": self.controller.state.hard_cutoff_voltage_v,
+            "hard_cutoff_voltage_v": self._effective_limits()[0],
             "hard_cutoff_status": cutoff_action,
             "inverter_power_switch": inverter_switch_entity, "inverter_switch_state": inverter_switch_state,
             "inverter_full_lock_owned": self.controller.state.inverter_full_lock_owned, "inverter_switch_action": switch_action,
@@ -826,11 +864,11 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         if self.controller.state.flight_recorder_enabled:
             await self.recorder.async_append({
                 **absorption_data,
-                "timestamp":now.isoformat(), "events":"|".join(result.events),
+                "timestamp":now.isoformat(), "events":"|".join((["TEST_MODE"] if self._test_mode else []) + list(result.events)),
                 "capacity_previous_kwh":round(old_capacity_kwh,3),
                 "capacity_current_kwh":round(new_capacity_kwh,3),
                 "capacity_change_reason":capacity_change_reason,
-                "hard_cutoff_voltage_v":self.controller.state.hard_cutoff_voltage_v,
+                "hard_cutoff_voltage_v":self._effective_limits()[0],
                 "hard_cutoff_status":cutoff_action, "grid_w":snap.grid_w, "pv_w":snap.pv_w,
                 "battery_v":snap.battery_v, "battery_a":snap.battery_a, "battery_w":snap.battery_w, "inverter_output_w":snap.inverter_output_w,
                 "target_w":snap.target_w, "recommended_w":result.recommended_w, "applied_w":result.applied_w, "raw_target_w":result.raw_target_w,
@@ -881,7 +919,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
                 "full_charge_priority":result.full_charge_priority, "full_charge_opportunity":result.full_charge_opportunity,
                 "chemistry_strategy_state":result.chemistry_strategy_state, "days_since_full":result.days_since_full,
                 "calibration_state":result.calibration_state, "blocked_reason":result.blocked_reason,
-                "hard_cutoff_voltage_v":self.controller.state.hard_cutoff_voltage_v,
+                "hard_cutoff_voltage_v":self._effective_limits()[0],
             "hard_cutoff_status":cutoff_action,
             "inverter_power_switch":inverter_switch_entity, "inverter_switch_state":inverter_switch_state,
                 "inverter_full_lock_owned":self.controller.state.inverter_full_lock_owned, "inverter_switch_action":switch_action,

@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 DOMAIN = "adaptive_solar_controller"
-VERSION = "0.4.7rc1"
+VERSION = "0.4.7dev3"
+
+# Testmodus (nur zur Laufzeit, nach Neustart aus): angehobene Abschaltgrenzen und feste Ausgangsleistung
+TEST_CUTOFF_V = 24.3
+TEST_EMERGENCY_V = 24.1
+TEST_TARGET_W = 200
+TEST_MAX_SECONDS = 4 * 3600
 PLATFORMS = ["sensor", "select", "switch", "number", "binary_sensor"]
 
 CONF_GRID_SENSOR = "grid_sensor"

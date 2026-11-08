@@ -1,5 +1,16 @@
 # Changelog
 
+## dev (Entwicklungszweig, nicht veröffentlicht)
+
+Testversionen für den Anwender, werden nicht als Release veröffentlicht.
+
+### Testmodus
+- Neuer Schalter „Test mode (raised cutoff, fixed output)“. Nur zur Laufzeit, nach Neustart und nach 4 Stunden automatisch aus.
+- Im Testmodus: Abschaltgrenze 24,3 V, Notgrenze 24,1 V (die gespeicherten Werte bleiben unverändert), feste Ausgangsleistung
+  200 W (höchstens das eingestellte Wechselrichter-Maximum, nur in den Modi adaptive/predictive) und ausgesetzte FULL-Sperre,
+  damit der Wechselrichter gestartet werden kann. Beim Ein- und Ausschalten werden Verriegelung und Entprellung zurückgesetzt.
+- Der Flight Recorder markiert diese Zeilen mit `TEST_MODE` in `events` und zeigt die wirksame Abschaltgrenze.
+
 ## 0.4.7 RC1
 
 Fehlerbehebung an der FULL-Sperre, Abschaltbestätigung und Start-Marker im Flight Recorder.
@@ -8,6 +19,7 @@ Nicht an echter Hardware langzeitgetestet; vor dem Update `.storage` sichern.
 **Hinweis zum Verhalten:** Greift die Notfallregel der Blei-Säure-Strategie (standardmäßig nach 10 Tagen ohne FULL), schaltet ASC
 den Wechselrichter über den konfigurierten Schalter ab und hält ihn aus, bis eine Vollladung bestätigt ist. Mit der Korrektur
 der Besitzmarke passiert das jetzt auch dann, wenn der Schalter geändert oder umbenannt wurde.
+
 
 ### Abschaltbestätigung
 - Nach jedem `turn_off` (Batterie-Notabschaltung und FULL-Sperre) prüft ASC, ob der Schalter wirklich `off` meldet.

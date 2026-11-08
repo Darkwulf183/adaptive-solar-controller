@@ -132,6 +132,7 @@ Die Termine sind Planungsziele. Eine Version wird erst freigegeben, wenn die Tes
 ```bash
 python -m unittest discover -s tests -v        # Tests ohne Home Assistant
 node --check custom_components/adaptive_solar_controller/frontend/asc-panel.js
+./scripts/set-github-user.sh <github-name>     # einmalig nach dem Anlegen des Repos
 ```
 
 Änderungen stehen im [CHANGELOG](CHANGELOG.md), ältere Hinweise in [`docs/history/`](docs/history/).

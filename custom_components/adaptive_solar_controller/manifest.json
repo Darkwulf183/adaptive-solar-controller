@@ -17,5 +17,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/Darkwulf183/adaptive-solar-controller/issues",
   "requirements": [],
-  "version": "0.4.7rc1"
+  "version": "0.4.7dev3"
 }
