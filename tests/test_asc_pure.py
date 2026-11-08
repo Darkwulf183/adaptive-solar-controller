@@ -2,7 +2,7 @@
 import importlib.util
 import pathlib
 import unittest
-from datetime import date
+from datetime import date, datetime
 
 BASE = pathlib.Path(__file__).resolve().parent.parent / "custom_components" / "adaptive_solar_controller"
 
@@ -16,6 +16,8 @@ def load(name):
 
 safety = load("safety")
 pv = load("passive_pv")
+marker = load("start_marker")
+lock_owner = load("lock_owner")
 TODAY = date(2026, 11, 6)
 
 
@@ -109,6 +111,42 @@ class CsvTests(unittest.TestCase):
     def test_estimate_falls_back_to_month(self):
         self.assertEqual(pv.estimate({"2025-06-10": 10.0, "2025-06-20": 20.0}, date(2026, 6, 15)), 15.0)
         self.assertIsNone(pv.estimate({}, date(2026, 6, 15)))
+
+class StartMarkerTests(unittest.TestCase):
+    NOW = datetime(2026, 11, 8, 16, 12, 41)
+
+    def test_ha_start(self):
+        self.assertEqual(marker.build_start_marker("0.4.7", False, self.NOW), "ASC_START:0.4.7:ha_start@16:12:41")
+
+    def test_reload(self):
+        self.assertEqual(marker.build_start_marker("0.4.7", True, self.NOW), "ASC_START:0.4.7:setup_or_reload@16:12:41")
+
+    def test_does_not_break_event_separators(self):
+        m = marker.build_start_marker("0.4.7", False, self.NOW)
+        self.assertNotIn(",", m)
+        self.assertNotIn("|", m)
+
+class LockOwnerTests(unittest.TestCase):
+    R = staticmethod(lambda *a: lock_owner.reconcile_lock_owner(*a))
+
+    def test_not_owned_changes_nothing(self):
+        self.assertEqual(self.R(False, "", "switch.a", "on")[0], "not_owned")
+
+    def test_same_entity(self):
+        self.assertEqual(self.R(True, "switch.a", "switch.a", "off"), ("same", True, "switch.a"))
+
+    def test_renamed_switch_is_off_adopted(self):
+        self.assertEqual(self.R(True, "switch.old", "switch.new", "off"), ("owner_switch_adopted", True, "switch.new"))
+
+    def test_renamed_switch_is_on_marker_dropped(self):
+        self.assertEqual(self.R(True, "switch.old", "switch.new", "on"), ("stale_owner_released", False, ""))
+
+    def test_empty_stored_entity_is_treated_as_changed(self):
+        self.assertEqual(self.R(True, "", "switch.new", "on")[0], "stale_owner_released")
+
+    def test_unavailable_switch_waits(self):
+        for st in ("unavailable", "unknown", None):
+            self.assertEqual(self.R(True, "switch.old", "switch.new", st), ("owner_switch_pending", True, "switch.old"))
 
 
 if __name__ == "__main__":

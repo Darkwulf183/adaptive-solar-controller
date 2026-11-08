@@ -6,7 +6,7 @@ wie viel Batterieenergie bis zur nächsten ausreichenden PV-Ladung sicher genutz
 
 [![HACS Custom Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Darkwulf183&repository=adaptive-solar-controller&category=integration)
 
-> **Status: Release Candidate (0.4.6 RC4), Weg zu 0.5.0.** Die Software greift in die Steuerung eines
+> **Status: Release Candidate (0.4.7 RC1), Weg zu 0.5.0.** Die Software greift in die Steuerung eines
 > Wechselrichters ein und kann ihn bei Unterspannung abschalten. Sie ist nicht über längere Zeit an
 > verschiedenen Anlagen getestet und **ersetzt keinen Hardware-Batterieschutz und kein BMS**.
 > Nutzung auf eigene Verantwortung, zuerst im Modus `monitor` beobachten.
@@ -107,10 +107,11 @@ Die `entry_id` wird nur für den CSV-Import im Panel gebraucht.
   `input_number.inverter_target_power`). Der Zurück-Button führt nach `/dashboard-solar/solar`.
   In anderen Installationen die Werte in `frontend/asc-panel.js` (Funktion `cfg`) anpassen. Eine
   Konfiguration über die Integration ist für 0.5 geplant. Das Panel wurde nur in Chromium getestet.
-- **Abschaltbestätigung:** ASC sendet `turn_off`, prüft aber nicht, ob der Schalter danach wirklich aus ist.
-- **FULL-Sperre:** Wurde der Inverter-Schalter in der Konfiguration geändert, kann der gespeicherte Besitz
-  der Sperre hängen bleiben (Status `config_changed_manual_recovery`). Dann greift die FULL-Haltephase nicht.
-- **Tests:** Es gibt Unit-Tests für Schutzlogik und CSV-Import. Controller, Planner und Batterie-Schätzer
+- **Abschaltbestätigung:** ASC prüft seit 0.4.7 RC1, ob der Schalter nach `turn_off` wirklich `off` meldet, wiederholt den Befehl
+  und meldet Misserfolg in Home Assistant. Ein Wechselrichter, der nicht über diesen Schalter hängt, wird von ASC weder überwacht noch geschützt.
+- **FULL-Sperre:** Wird der Inverter-Schalter geändert oder umbenannt, gleicht ASC seit 0.4.7 RC1 die gespeicherte Besitzmarke an
+  (siehe CHANGELOG). Bis dahin blockierte die Marke das Abschalten (Status `config_changed_manual_recovery`).
+- **Tests:** Es gibt Unit-Tests für Schutzlogik, CSV-Import, Abschaltbestätigung und FULL-Sperre (mit simuliertem Home Assistant). Planner und Batterie-Schätzer
   sind noch nicht per Test abgedeckt. Die Replay-Auswertung mit Flight-Recorder-Daten läuft bisher manuell.
 - Die Beispiel-Dashboard-Datei [`examples/dashboard_solar_asc.yaml`](examples/dashboard_solar_asc.yaml)
   ist das persönliche Dashboard des Entwicklers und braucht die Karten `modern-circular-gauge` und `apexcharts-card`.

@@ -18,6 +18,8 @@ from homeassistant.util import dt as dt_util
 from .const import *
 from .controller import AdaptiveController, PlantSnapshot
 from .flight_recorder import FlightRecorder
+from .lock_owner import ADOPTED, PENDING, RELEASED, reconcile_lock_owner
+from . import switch_confirm
 from .storage import LearningStore
 from .rebound_learning import rebuild_reference_model, predicted_sag
 from .passive_pv import estimate, summary
@@ -43,6 +45,8 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         self._remove_watchdog = None
         self._low_recovery_session = None
         self._cutoff_latched = False
+        self._cutoff_off = switch_confirm.SwitchOffTracker()
+        self._lock_off = switch_confirm.SwitchOffTracker()
         self._guard = UndervoltageGuard()
         self._safety_lock = asyncio.Lock()
         self._last_cutoff_status = "ok"
@@ -468,14 +472,36 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
                     self._cutoff_notified = True
                 return "cutoff_no_dedicated_switch"
             st = self._state(entity_id)
-            if st and st.state == "on":
-                try:
-                    await self.hass.services.async_call("switch", "turn_off", {"entity_id": entity_id}, blocking=True)
-                    return "cutoff_switch_off_sent"
-                except Exception:
-                    _LOGGER.exception("ASC hard cutoff switch-off failed")
-                    return "cutoff_switch_error"
-            return "cutoff_latched"
+            now = time.monotonic()
+            sw = None if st is None else st.state
+            if sw not in ("on", "off"):
+                return "cutoff_switch_unavailable"
+            observed = self._cutoff_off.observe(sw, now)
+            if sw == "off":
+                if observed == switch_confirm.CONFIRMED:
+                    persistent_notification.async_dismiss(self.hass, "asc_switch_off_unconfirmed")
+                    return "cutoff_switch_off_confirmed"
+                return "cutoff_latched"
+            if observed == switch_confirm.PENDING:
+                return "cutoff_switch_off_pending"
+            try:
+                await self.hass.services.async_call("switch", "turn_off", {"entity_id": entity_id}, blocking=True)
+            except Exception:
+                _LOGGER.exception("ASC hard cutoff switch-off failed")
+                self._cutoff_off.sent(now)
+                return "cutoff_switch_error"
+            self._cutoff_off.sent(now)
+            if self._cutoff_off.unconfirmed:
+                persistent_notification.async_create(
+                    self.hass,
+                    f"Die Batterie-Abschaltgrenze wurde erreicht, aber der Schalter {entity_id} meldet nach "
+                    f"{self._cutoff_off.attempts} Abschaltbefehlen weiter 'an'. Bitte den Wechselrichter "
+                    "von Hand prüfen und abschalten.",
+                    title="ASC: Abschaltung nicht bestätigt",
+                    notification_id="asc_switch_off_unconfirmed",
+                )
+                return "cutoff_switch_off_unconfirmed"
+            return "cutoff_switch_off_sent" if self._cutoff_off.attempts == 1 else "cutoff_switch_off_retry"
 
     async def _async_set_target(self, applied: float, current: float) -> None:
         """Write the inverter target helper, clamped to the helper's own min/max."""
@@ -510,21 +536,48 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         self._passive_cache = (key, stats)
         return stats
 
+    async def _async_send_lock_off(self, entity_id: str, now: float) -> str:
+        """Send turn_off for the FULL lock; repeat and alert while the switch stays on."""
+        try:
+            await self.hass.services.async_call("switch", "turn_off", {"entity_id": entity_id}, blocking=True)
+        except Exception:
+            _LOGGER.exception("ASC could not turn off inverter %s", entity_id)
+            return "turn_off_failed"
+        self._lock_off.sent(now)
+        if self._lock_off.unconfirmed:
+            persistent_notification.async_create(
+                self.hass,
+                f"ASC hat {self._lock_off.attempts}-mal versucht, den Schalter {entity_id} für die FULL-Sperre "
+                "abzuschalten, er meldet aber weiter 'an'. Bitte den Wechselrichter von Hand prüfen.",
+                title="ASC: Abschaltung nicht bestätigt",
+                notification_id="asc_switch_off_unconfirmed",
+            )
+            return "turn_off_unconfirmed"
+        return "turn_off_sent" if self._lock_off.attempts == 1 else "turn_off_retry"
+
     async def _async_manage_full_lock(self, chemistry_state: str, mode: str) -> str:
         """Own only our own switch-off, never re-enable a manually off inverter."""
         state = self.controller.state
         entity_id = self.cfg.get(CONF_INVERTER_POWER_SWITCH) or ""
         owned = bool(state.inverter_full_lock_owned)
         previous_entity = state.inverter_full_lock_entity
-        # Never operate a different switch using ownership persisted for another entity.
-        if owned and previous_entity != entity_id:
-            _LOGGER.warning("ASC FULL lock owned for %s; switch configuration changed. Manual recovery required", previous_entity)
-            return "config_changed_manual_recovery"
         if not entity_id:
             return "not_configured"
         if entity_id == self.cfg.get(CONF_SOLAR_ENABLE):
             return "invalid_same_as_solar_enable"
         switch = self._state(entity_id)
+        # The configured switch changed (or was renamed) while we own a lock: align the stored
+        # ownership with the configured switch. Nothing is switched here, only the marker changes.
+        if owned and previous_entity != entity_id:
+            outcome, new_owned, new_entity = reconcile_lock_owner(
+                owned, previous_entity, entity_id, None if switch is None else switch.state)
+            if outcome in (ADOPTED, RELEASED):
+                _LOGGER.warning("ASC FULL lock: switch changed from %r to %s (%s)", previous_entity, entity_id, outcome)
+                state.inverter_full_lock_owned = new_owned
+                state.inverter_full_lock_entity = new_entity
+                await self.store.async_save(state)
+                return outcome
+            return PENDING
         if switch is None or switch.state not in ("on", "off"):
             return "switch_unavailable"
         # Monitor/Off is observational only, including release actions.
@@ -532,26 +585,35 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             return "monitor_no_action"
         lock_required = self.controller.state.battery_chemistry == "lead_acid" and chemistry_state in ("lead_full_hold", "lead_full_emergency")
         if lock_required:
+            now = time.monotonic()
             if owned:
+                observed = self._lock_off.observe(switch.state, now)
                 if switch.state == "on":
-                    # Someone has switched it on manually. Stop claiming ownership.
-                    state.inverter_full_lock_owned = False
-                    state.inverter_full_lock_entity = ""
-                    await self.store.async_save(state)
-                    return "manual_override_on"
+                    if observed == switch_confirm.IDLE:
+                        # No open switch-off command of ours: someone switched it on manually.
+                        state.inverter_full_lock_owned = False
+                        state.inverter_full_lock_entity = ""
+                        await self.store.async_save(state)
+                        return "manual_override_on"
+                    if observed == switch_confirm.PENDING:
+                        return "turn_off_pending"
+                    return await self._async_send_lock_off(entity_id, now)
+                if observed == switch_confirm.CONFIRMED:
+                    persistent_notification.async_dismiss(self.hass, "asc_switch_off_unconfirmed")
+                    return "turn_off_confirmed"
                 return "locked_off"
             if switch.state == "off":
                 return "already_off_not_owned"
-            try:
-                await self.hass.services.async_call("switch", "turn_off", {"entity_id": entity_id}, blocking=True)
-            except Exception:
-                _LOGGER.exception("ASC could not turn off inverter %s", entity_id)
-                return "turn_off_failed"
-            # Persist ownership before next cycle/restart; check actual state next cycle.
+            # Persist ownership before the command so a restart cannot lose it.
             state.inverter_full_lock_owned = True
             state.inverter_full_lock_entity = entity_id
             await self.store.async_save(state)
-            return "turn_off_sent"
+            result = await self._async_send_lock_off(entity_id, now)
+            if result == "turn_off_failed":
+                state.inverter_full_lock_owned = False
+                state.inverter_full_lock_entity = ""
+                await self.store.async_save(state)
+            return result
         if not owned:
             return "no_lock"
         if switch.state == "on":
@@ -563,8 +625,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         if chemistry_state != "lead_post_full":
             return "awaiting_confirmed_full"
         full_ts = state.last_full_anchor_ts
-        from time import time
-        if not full_ts or time() - float(full_ts) < 3600:
+        if not full_ts or time.time() - float(full_ts) < 3600:
             return "awaiting_confirmed_full"
         try:
             await self.hass.services.async_call("switch", "turn_on", {"entity_id": entity_id}, blocking=True)

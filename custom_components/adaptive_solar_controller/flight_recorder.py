@@ -5,7 +5,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CoreState, HomeAssistant
+
+from .const import VERSION
+from .start_marker import build_start_marker
 
 
 FIELDS = [
@@ -35,6 +38,11 @@ class FlightRecorder:
         self.hass = hass
         self.entry_id = entry_id
         self._ok_path: Path | None = None  # file whose header was already verified
+        # Wird an das Feld `events` der ersten geschriebenen Zeile gehängt, damit
+        # Neustarts und Neuladen in den Aufzeichnungen sichtbar sind (nicht nur als Lücke).
+        self._start_marker: str | None = build_start_marker(
+            VERSION, hass.state is CoreState.running, datetime.now().astimezone()
+        )
 
     @property
     def path(self) -> Path:
@@ -51,6 +59,10 @@ class FlightRecorder:
         await self.hass.async_add_executor_job(self._append_sync, row)
 
     def _append_sync(self, row: dict[str, Any]) -> None:
+        if self._start_marker:
+            events = str(row.get("events") or "")
+            row = {**row, "events": f"{self._start_marker}|{events}" if events else self._start_marker}
+            self._start_marker = None
         path = self.path
         path.parent.mkdir(parents=True, exist_ok=True)
         exists = path.exists() and path.stat().st_size > 0
