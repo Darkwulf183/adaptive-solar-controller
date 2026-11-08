@@ -1,0 +1,1 @@
+RC3 CSV file selection hotfix: persist selected File across HA hass re-renders; retain import status. No backend/control logic changed.

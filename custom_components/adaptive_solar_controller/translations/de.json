@@ -1,0 +1,114 @@
+{
+  "title": "Adaptive Solar Controller",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Adaptive Solar Controller einrichten",
+        "description": "ASC v0.4 plant die Batterie über Energy Budget, Full Confidence, Forecast Trust und saisonale Erzeugung. Alte Battery-High-/Max-Limit-Helper werden nicht mehr benötigt.",
+        "data": {
+          "grid_sensor": "Netzleistung",
+          "pv_sensor": "PV-Leistung real",
+          "daily_production_sensor": "PV-Tageserzeugung (Seasonal Learning)",
+          "battery_voltage_sensor": "Batteriespannung",
+          "battery_current_sensor": "Batteriestrom",
+          "battery_power_sensor": "Batterieleistung (optional)",
+          "inverter_output_sensor": "Hauptinverter Ist-Leistung",
+          "target_helper": "Inverter Zielwert Helper",
+          "battery_low_helper": "Batterie Hard-Low Helper",
+          "backup_inverter": "Backup-Inverter Sollleistung",
+          "solar_enable": "Solar-Freigabe / Input Solar",
+          "forecast_power_now": "Forecast.Solar Leistung jetzt",
+          "forecast_power_next_hour": "Forecast.Solar Leistung in 1 Stunde",
+          "forecast_energy_next_hour": "Forecast.Solar Energie nächste Stunde",
+          "forecast_energy_today": "Forecast.Solar Energie heute",
+          "forecast_energy_remaining": "Forecast.Solar Restenergie heute",
+          "forecast_energy_tomorrow": "Forecast.Solar Energie morgen",
+          "forecast_peak_time_today": "Forecast.Solar Peakzeit heute",
+          "grid_target": "Gewünschter Netzbezug",
+          "backup_block_w": "Backup-Sperre ab",
+          "min_target_w": "Minimaler Inverter-Zielwert",
+          "max_step_w": "Maximale normale Änderung je Zyklus",
+          "hard_max_w": "Absolute Inverter-Maximalleistung",
+          "inverter_power_switch": "Inverter-Power-Schalter (optional, für Notabschaltung/FULL-Sperre)",
+          "absorption_voltage_v": "Absorptionsspannung",
+          "absorption_tolerance_v": "Absorptions-Toleranz",
+          "absorption_minutes": "Absorptionszeit für FULL"
+        }
+      },
+      "reconfigure": {
+        "title": "Adaptive Solar Controller rekonfigurieren",
+        "description": "Anlage, Forecast und Grenzwerte neu zuordnen. Gelerntes ASC-Wissen bleibt erhalten.",
+        "data": {
+          "grid_sensor": "Netzleistung",
+          "pv_sensor": "PV-Leistung real",
+          "daily_production_sensor": "PV-Tageserzeugung (Seasonal Learning)",
+          "battery_voltage_sensor": "Batteriespannung",
+          "battery_current_sensor": "Batteriestrom",
+          "battery_power_sensor": "Batterieleistung (optional)",
+          "inverter_output_sensor": "Hauptinverter Ist-Leistung",
+          "target_helper": "Inverter Zielwert Helper",
+          "battery_low_helper": "Batterie Hard-Low Helper",
+          "backup_inverter": "Backup-Inverter Sollleistung",
+          "solar_enable": "Solar-Freigabe / Input Solar",
+          "forecast_power_now": "Forecast.Solar Leistung jetzt",
+          "forecast_power_next_hour": "Forecast.Solar Leistung in 1 Stunde",
+          "forecast_energy_next_hour": "Forecast.Solar Energie nächste Stunde",
+          "forecast_energy_today": "Forecast.Solar Energie heute",
+          "forecast_energy_remaining": "Forecast.Solar Restenergie heute",
+          "forecast_energy_tomorrow": "Forecast.Solar Energie morgen",
+          "forecast_peak_time_today": "Forecast.Solar Peakzeit heute",
+          "grid_target": "Gewünschter Netzbezug",
+          "backup_block_w": "Backup-Sperre ab",
+          "min_target_w": "Minimaler Inverter-Zielwert",
+          "max_step_w": "Maximale normale Änderung je Zyklus",
+          "hard_max_w": "Absolute Inverter-Maximalleistung",
+          "inverter_power_switch": "Inverter-Power-Schalter (optional, für Notabschaltung/FULL-Sperre)",
+          "absorption_voltage_v": "Absorptionsspannung",
+          "absorption_tolerance_v": "Absorptions-Toleranz",
+          "absorption_minutes": "Absorptionszeit für FULL"
+        }
+      }
+    },
+    "abort": {
+      "reconfigure_successful": "Rekonfiguration gespeichert.",
+      "already_configured": "ASC ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Adaptive Solar Controller Optionen",
+        "description": "Änderungen werden nach Speichern neu geladen.",
+        "data": {
+          "grid_sensor": "Netzleistung",
+          "pv_sensor": "PV-Leistung real",
+          "daily_production_sensor": "PV-Tageserzeugung (Seasonal Learning)",
+          "battery_voltage_sensor": "Batteriespannung",
+          "battery_current_sensor": "Batteriestrom",
+          "battery_power_sensor": "Batterieleistung (optional)",
+          "inverter_output_sensor": "Hauptinverter Ist-Leistung",
+          "target_helper": "Inverter Zielwert Helper",
+          "battery_low_helper": "Batterie Hard-Low Helper",
+          "backup_inverter": "Backup-Inverter Sollleistung",
+          "solar_enable": "Solar-Freigabe / Input Solar",
+          "forecast_power_now": "Forecast.Solar Leistung jetzt",
+          "forecast_power_next_hour": "Forecast.Solar Leistung in 1 Stunde",
+          "forecast_energy_next_hour": "Forecast.Solar Energie nächste Stunde",
+          "forecast_energy_today": "Forecast.Solar Energie heute",
+          "forecast_energy_remaining": "Forecast.Solar Restenergie heute",
+          "forecast_energy_tomorrow": "Forecast.Solar Energie morgen",
+          "forecast_peak_time_today": "Forecast.Solar Peakzeit heute",
+          "grid_target": "Gewünschter Netzbezug",
+          "backup_block_w": "Backup-Sperre ab",
+          "min_target_w": "Minimaler Inverter-Zielwert",
+          "max_step_w": "Maximale normale Änderung je Zyklus",
+          "hard_max_w": "Absolute Inverter-Maximalleistung",
+          "inverter_power_switch": "Inverter-Power-Schalter (optional, für Notabschaltung/FULL-Sperre)",
+          "absorption_voltage_v": "Absorptionsspannung",
+          "absorption_tolerance_v": "Absorptions-Toleranz",
+          "absorption_minutes": "Absorptionszeit für FULL"
+        }
+      }
+    }
+  }
+}

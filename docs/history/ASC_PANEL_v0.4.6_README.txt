@@ -1,0 +1,9 @@
+ASC v0.4.6 RC2 Panel Update
+
+Frontend: frontend/asc-panel.js
+Panel configuration: panel_custom_v0.4.6.yaml (identisch zur bisherigen URL; nicht doppelt einbinden).
+
+Diese Aktualisierung erweitert nur die Anzeige, nicht die Steuerlogik.
+HA neu starten und Browser-Cache fuer /asc_static/asc-panel.js neu laden.
+Fehlende Entitaeten erscheinen als — und muessen in HA kontrolliert werden.
+Notabschaltung und APsystems-Switch vor aktiver Nutzung separat pruefen.

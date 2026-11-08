@@ -1,0 +1,8 @@
+panel_custom:
+  - name: adaptive-solar-controller-panel
+    sidebar_title: ASC Panel
+    sidebar_icon: mdi:solar-power-variant
+    url_path: asc-panel
+    module_url: /asc_static/asc-panel.js?v=046rc4ui3
+    config:
+      entry_id: DEINE_ENTRY_ID

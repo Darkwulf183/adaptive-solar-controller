@@ -1,0 +1,994 @@
+type: sections
+max_columns: 3
+title: Solar
+path: solar
+sections:
+- type: grid
+  cards:
+  - type: heading
+    heading: Solar Anlage
+    icon: mdi:solar-power
+  - type: entities
+    title: ASC v0.4.6 · FULL Absorptionszeit
+    show_header_toggle: false
+    entities:
+      - entity: sensor.adaptive_solar_controller_full_absorption_elapsed
+        name: Gesammelte Absorptionszeit
+      - entity: number.adaptive_solar_controller_full_absorption_required
+        name: Eingestellte Absorptionszeit
+      - entity: sensor.adaptive_solar_controller_full_absorption_remaining
+        name: Verbleibende Absorptionszeit
+      - entity: sensor.adaptive_solar_controller_full_absorption_status
+        name: Zeitstatus
+      - entity: sensor.adaptive_solar_controller_full_anchor_source
+        name: Letzter FULL-Anker
+  - type: entities
+    title: ASC v0.4.6 · LOW-Recovery und Sicherheit
+    show_header_toggle: false
+    entities:
+      - entity: select.adaptive_solar_controller_low_recovery_calibration_mode
+        name: LOW-Recovery Modus
+      - entity: sensor.adaptive_solar_controller_low_recovery_status
+        name: Kalibrierstatus
+      - entity: sensor.adaptive_solar_controller_low_recovery_step
+        name: Stufe
+      - entity: sensor.adaptive_solar_controller_low_recovery_phase
+        name: Messphase
+      - entity: sensor.adaptive_solar_controller_low_recovery_remaining
+        name: Verbleibende Zeit
+      - entity: sensor.adaptive_solar_controller_low_recovery_successful_runs
+        name: Erfolgreiche Durchläufe
+      - entity: sensor.adaptive_solar_controller_rebound_valid_power_bins
+        name: Rückfederung · gültige Lastbereiche
+      - entity: number.adaptive_solar_controller_battery_hard_cutoff_voltage
+        name: Harte Unterspannungsgrenze
+      - entity: sensor.adaptive_solar_controller_battery_hard_cutoff_status
+        name: Abschaltstatus
+  - type: markdown
+    content: >
+      {% set a = states('sensor.solar_complete_ampere') | float(0) %}
+      {% set v = states('sensor.solar_average_voltage') | float(0) %}
+      {% set elevation = state_attr('sun.sun','elevation') | float(0) %}
+      {% if a > 2 %}
+      ## ☀️ Akku lädt **+{{ a | round(1) }} A · {{ ((a*v)/1000) | round(2) }} kW**
+      {% elif a < -1 %}
+      ## 🌙 Akku entlädt **{{ (-a) | round(1) }} A · {{ (((-a)*v)/1000) | round(2) }} kW**
+      {% else %}
+      ## 🔋 Akku nahezu ausgeglichen **{{ a | round(1) }} A**
+      {% endif %}
+      🔋 {{ v | round(2) }} V · ☀️ Sonnenstand {{ elevation | round(1) }}°
+  - type: statistics-graph
+    entities:
+    - sensor.solar_complete_ampere
+    - sensor.sun_solar_elevation
+    title: Sun & Strom
+    days_to_show: 7
+    period: 5minute
+    chart_type: line
+    stat_types: [mean]
+  - type: horizontal-stack
+    cards:
+    - type: custom:modern-circular-gauge
+      entity: sensor.solar_average_voltage
+      name: Akku
+      unit: V
+      min: 21
+      max: 30
+      smooth_segments: true
+      adaptive_state_color: true
+      adaptive_icon_color: true
+      adaptive_label_color: true
+      gauge_foreground_style: {width: 10, color: adaptive}
+      gauge_background_style: {width: 2, color: adaptive}
+      segments:
+      - from: 0
+        color: [255, 0, 0]
+      - from: 23.16
+        color: [252, 161, 3]
+      - from: 23.8
+        color: [43, 255, 0]
+      show_graph: true
+      header_position: top
+    - type: custom:modern-circular-gauge
+      entity: sensor.solar_complete_ampere
+      name: Akku Strom
+      unit: A
+      min: -40
+      max: 120
+      smooth_segments: true
+      adaptive_state_color: true
+      adaptive_icon_color: true
+      adaptive_label_color: true
+      gauge_foreground_style: {width: 10, color: adaptive}
+      gauge_background_style: {width: 2, color: adaptive}
+      segments:
+      - from: -40
+        color: [0, 0, 255]
+      - from: 0
+        color: [255, 0, 0]
+      - from: 10
+        color: [252, 161, 3]
+      - from: 20
+        color: [43, 255, 0]
+      show_graph: true
+      header_position: top
+    - type: custom:modern-circular-gauge
+      entity: sensor.solar_akku_entladeleistung
+      name: Entladeleistung
+      unit: kW
+      min: 0
+      max: 3
+      smooth_segments: true
+      adaptive_state_color: true
+      adaptive_icon_color: true
+      adaptive_label_color: true
+      gauge_foreground_style: {width: 10, color: adaptive}
+      gauge_background_style: {width: 2, color: adaptive}
+      segments:
+      - from: 0
+        color: [0, 255, 0]
+      - from: 1
+        color: [255, 255, 0]
+      - from: 2
+        color: [255, 128, 0]
+      - from: 2.7
+        color: [255, 0, 0]
+      show_graph: true
+      header_position: top
+  - type: custom:modern-circular-gauge
+    entity: sensor.e320_power_in
+    name: Netz / Solar
+    secondary:
+      entity: sensor.input_solar_power
+      unit: W
+      show_gauge: inner
+      state_size: small
+      gauge_radius: 40
+      max: 1600
+      adaptive_label_color: true
+      adaptive_state_color: true
+      gauge_foreground_style: {width: 5}
+      segments:
+      - from: 0
+        color: [200, 200, 0]
+    min: -1000
+    max: 10000
+    smooth_segments: true
+    adaptive_state_color: true
+    adaptive_label_color: true
+    gauge_foreground_style: {width: 5}
+    segments:
+    - from: -1000
+      color: [0, 255, 0]
+    header_position: bottom
+    show_graph: false
+
+  - type: custom:modern-circular-gauge
+    name: EPEVER Load
+    entity: sensor.epever_tracer_1_load_current
+    unit: A
+    min: 0
+    max: 40
+    smooth_segments: true
+    adaptive_state_color: true
+    adaptive_label_color: true
+    show_icon: false
+    secondary:
+      entity: sensor.epever_tracer_2_load_current
+      unit: A
+      show_gauge: inner
+      min: 0
+      max: 40
+      smooth_segments: true
+      adaptive_state_color: true
+      adaptive_label_color: true
+      segments:
+      - from: 0
+        color:
+        - 0
+        - 255
+        - 0
+      - from: 25
+        color:
+        - 255
+        - 128
+        - 64
+      - from: 35
+        color:
+        - 255
+        - 0
+        - 0
+    segments:
+    - from: 0
+      color:
+      - 0
+      - 255
+      - 0
+    - from: 25
+      color:
+      - 255
+      - 128
+      - 64
+    - from: 35
+      color:
+      - 255
+      - 0
+      - 0
+  - type: heading
+    heading: Akku Entladephase
+    icon: mdi:battery-arrow-down
+  - type: markdown
+    grid_options:
+      columns: 12
+      rows: 4
+    content: "{% set phase = is_state('input_boolean.solar_entladephase','on') %} {% set ah = states('sensor.solar_entladephase_ah') | float(0) %} {% set kwh = states('sensor.solar_entladephase_kwh') | float(0) %} {% set a = states('sensor.solar_akku_entladestrom') | float(0) %} {% set kw = states('sensor.solar_akku_entladeleistung') | float(0) %} {% set startv = states('input_number.solar_entladephase_startspannung') | float(0) %} {% set nowv = states('sensor.solar_average_voltage') | float(0) %}\n\n{% if phase %} ## 🌙 Entladephase läuft\n\n**Aktuell:** {{ a | round(1) }} A · {{ kw | round(2) }} kW\n\n**Seit PV-Ende:** {{ ah | round(1) }} Ah · {{ kwh | round(2) }} kWh\n\n**Start:** {{ states('input_datetime.solar_entladephase_start') }}\n\n**Spannung:** {{ startv | round(2) }} V → {{ nowv | round(2) }} V\n\n**Vorherige Nacht:** {{ states('input_number.solar_letzte_entladung_ah') }} Ah · {{ states('input_number.solar_letzte_entladung_kwh') }} kWh\n\n{% else %} ## ☀️ Keine Entladephase\n\n**Letzte Entladephase:** {{ ah | round(1) }} Ah · {{ kwh | round(2) }} kWh\n\n**Startspannung:** {{ startv | round(2) }} V\n\n🔋 Aktuell {{ nowv | round(2) }} V {% endif %}"
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.solar_entladephase_ah
+      name: Entnommen
+      icon: mdi:battery-minus
+    - type: tile
+      entity: sensor.solar_entladephase_kwh
+      name: Energie
+      icon: mdi:lightning-bolt
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.solar_akku_entladestrom
+      name: Entladung
+      icon: mdi:current-dc
+    - type: tile
+      entity: sensor.solar_akku_entladeleistung
+      name: Leistung
+      icon: mdi:flash
+  - type: heading
+    heading: Energie
+    icon: mdi:chart-line
+  - type: horizontal-stack
+    cards:
+    - type: sensor
+      graph: line
+      detail: 2
+      entity: sensor.solar_tageserzeugung
+      name: Erzeugung heute
+      icon: mdi:solar-power
+    - type: sensor
+      graph: line
+      detail: 2
+      entity: sensor.solar_tagesverbrauch
+      name: Verbrauch heute
+      icon: mdi:home-lightning-bolt
+  - type: horizontal-stack
+    cards:
+    - type: sensor
+      graph: line
+      detail: 2
+      entity: sensor.solar_jahreserzeugung
+      name: Erzeugung Jahr
+      hours_to_show: 240
+      icon: mdi:solar-power
+    - type: sensor
+      graph: line
+      detail: 2
+      entity: sensor.solar_jahresverbrauch
+      name: Verbrauch Jahr
+      hours_to_show: 240
+      icon: mdi:home-lightning-bolt
+  - type: horizontal-stack
+    cards:
+    - type: sensor
+      graph: line
+      entity: sensor.solar_yield_overview
+      detail: 1
+    - type: sensor
+      graph: line
+      entity: sensor.solar_yield_year
+      detail: 1
+      hours_to_show: 240
+  - type: heading
+    heading: Inverter Steuerung
+    icon: mdi:power-plug-battery
+  - type: entities
+    state_color: true
+    entities:
+    - entity: sensor.input_solar_power
+      name: Solar Leistung
+    - entity: number.apsystems_apsystems_1_max_output_power
+      name: Inverter 1
+    - entity: number.ez1_backup_apsystems_ez1_backup_max_output_power
+      name: Backup Inverter
+    - entity: switch.input_solar
+    - entity: input_number.inverter_target_power
+      name: Sollleistung
+    - entity: input_number.battery_voltage_high
+      name: Akku obere Grenze
+    - entity: input_number.battery_voltage_low
+      name: Akku untere Grenze
+    - entity: input_number.inverter_max_limit
+      name: Inverter Limit
+  - type: heading
+    heading: ASC v0.4.4 · Estimator → Planner → Fast Controller
+    icon: mdi:brain
+  - type: markdown
+    content: >
+      {% set status = states('sensor.adaptive_solar_controller_controller_state') %}
+      {% set plan = states('sensor.adaptive_solar_controller_battery_energy_budget_state') %}
+      {% set reason = states('sensor.adaptive_solar_controller_energy_planner_reason') %}
+      {% set grid = states('sensor.e320_power_in') | float(0) %}
+      {% set target = states('input_number.inverter_target_power') | float(0) %}
+      {% set limit = states('sensor.adaptive_solar_controller_effective_inverter_limit') | float(0) %}
+      {% set reserve = states('sensor.adaptive_solar_controller_estimated_battery_reserve') | float(0) %}
+      {% set reserve_target = states('sensor.adaptive_solar_controller_target_reserve_at_next_pv_charge') | float(0) %}
+      ## 🧠 ASC v0.4.4 · {{ status }}
+      **Netz:** {{ grid|round(0) }} W · **Soll:** {{ target|round(0) }} W · **Planner-Limit:** {{ limit|round(0) }} W
+
+      **Planner:** {{ plan }} · {{ reason }}
+
+      **Akku-Reserve:** {{ reserve|round(1) }} % → **Ziel am nächsten PV-Start:** {{ reserve_target|round(1) }} %
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: switch.input_solar
+      name: Solar Freigabe
+      icon: mdi:solar-power
+    - type: tile
+      entity: switch.adaptive_solar_controller_controller_enabled
+      name: ASC Controller
+      icon: mdi:brain
+    - type: tile
+      entity: input_number.inverter_target_power
+      name: ASC Soll
+      icon: mdi:target
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_recommended_target
+      name: Empfehlung
+    - type: tile
+      entity: sensor.adaptive_solar_controller_applied_target
+      name: Angewendet
+    - type: tile
+      entity: sensor.adaptive_solar_controller_effective_inverter_limit
+      name: Planner Limit
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_grid_target_error
+      name: Grid Error
+    - type: tile
+      entity: sensor.adaptive_solar_controller_export_escalation
+      name: Export
+    - type: tile
+      entity: sensor.adaptive_solar_controller_energy_planner_reason
+      name: Planner Grund
+
+  - type: heading
+    heading: ASC v0.4.4 · Strategy Learner
+    icon: mdi:chart-bell-curve-cumulative
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: select.adaptive_solar_controller_battery_chemistry
+      name: Battery Chemistry
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_power_envelope
+      name: Power Envelope
+    - type: tile
+      entity: sensor.adaptive_solar_controller_progressive_release_gamma
+      name: Progressive Gamma
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_planning_confidence
+      name: Planning Confidence
+    - type: tile
+      entity: sensor.adaptive_solar_controller_last_planner_self_evaluation
+      name: Self Evaluation
+    - type: tile
+      entity: sensor.adaptive_solar_controller_learned_planning_reserve_adjustment
+      name: Reservekorrektur
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_energy_horizon_24h_balance
+      name: Bilanz 24 h
+    - type: tile
+      entity: sensor.adaptive_solar_controller_energy_horizon_48h_balance
+      name: Bilanz 48 h
+    - type: tile
+      entity: sensor.adaptive_solar_controller_energy_horizon_72h_balance
+      name: Bilanz 72 h
+  - type: horizontal-stack
+    cards:
+    - type: gauge
+      entity: sensor.adaptive_solar_controller_corrected_pv_forecast_today_total
+      name: PV Forecast korrigiert
+      min: 0
+      max: 20
+    - type: gauge
+      entity: sensor.adaptive_solar_controller_actual_pv_production_today
+      name: PV Erzeugung echt
+      min: 0
+      max: 20
+
+  - type: heading
+    heading: Battery Energy · v0.4.4
+    icon: mdi:battery-heart-variant
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_estimated_stored_battery_energy
+      name: Gespeicherte Energie
+      icon: mdi:battery
+    - type: tile
+      entity: sensor.adaptive_solar_controller_learned_usable_battery_capacity
+      name: Nutzbare Kapazität
+      icon: mdi:battery-heart-variant
+    - type: tile
+      entity: number.adaptive_solar_controller_battery_usable_capacity_start
+      name: Kapazität Startwert
+      icon: mdi:battery-plus-variant
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_energy_state_confidence
+      name: Energy Confidence
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_capacity_confidence
+      name: Capacity Confidence
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_measurement_quality
+      name: Messqualität
+  - type: heading
+    heading: Universelle Energie-Freigabe
+    icon: mdi:home-lightning-bolt
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: binary_sensor.adaptive_solar_controller_energy_surplus_available
+      name: Energie frei
+      icon: mdi:check-circle-outline
+    - type: tile
+      entity: sensor.adaptive_solar_controller_available_surplus_power
+      name: Leistung frei
+    - type: tile
+      entity: sensor.adaptive_solar_controller_available_surplus_energy
+      name: Energie frei
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_surplus_confidence
+      name: Surplus Confidence
+    - type: tile
+      entity: sensor.adaptive_solar_controller_typical_energy_demand_until_next_pv_charge
+      name: Typischer Bedarf
+    - type: tile
+      entity: sensor.adaptive_solar_controller_recent_energy_demand_until_next_pv_charge
+      name: Jüngster Bedarf
+  - type: tile
+    entity: sensor.adaptive_solar_controller_last_demand_gap_classification
+    name: Letzte Bedarfsklassifizierung
+
+  - type: heading
+    heading: Battery Estimator · Vollzustände
+    icon: mdi:battery-heart-variant
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_learned_full_charge_voltage
+      name: Full Charge
+      icon: mdi:battery-charging-high
+    - type: tile
+      entity: sensor.adaptive_solar_controller_learned_full_transition_voltage
+      name: Full Transition
+      icon: mdi:battery-arrow-down-outline
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_full_relaxation_drop
+      name: Relaxation Drop
+      icon: mdi:arrow-collapse-down
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_full_confidence
+      name: Full Confidence
+    - type: tile
+      entity: sensor.adaptive_solar_controller_full_transition_confidence
+      name: Transition Confidence
+    - type: tile
+      entity: sensor.adaptive_solar_controller_pv_charge_phase
+      name: PV Ladephase
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_estimated_battery_reserve
+      name: Reserve
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_recovery_need
+      name: Recovery Need
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_recovery_state
+      name: Recovery State
+  - type: statistics-graph
+    entities:
+    - sensor.solar_average_voltage
+    - sensor.adaptive_solar_controller_learned_full_charge_voltage
+    - sensor.adaptive_solar_controller_learned_full_transition_voltage
+    - input_number.battery_voltage_low
+    title: ASC Batterie-Anker
+    days_to_show: 7
+    period: 5minute
+    chart_type: line
+    stat_types: [mean]
+  - type: heading
+    heading: Gesamtenergie bis nächster PV-Ladung
+    icon: mdi:home-clock
+  - type: markdown
+    content: >
+      {% set total = states('sensor.adaptive_solar_controller_learned_total_energy_until_next_pv_charge') | float(0) %}
+      {% set batt = states('sensor.adaptive_solar_controller_learned_battery_energy_until_next_pv_charge') | float(0) %}
+      {% set grid = states('sensor.adaptive_solar_controller_learned_grid_energy_until_next_pv_charge') | float(0) %}
+      {% set current = states('sensor.adaptive_solar_controller_current_energy_since_pv_charge_end') | float(0) %}
+      ## 🌙 Gelernter Gesamtbedarf **{{ total|round(2) }} kWh**
+      Akku {{ batt|round(2) }} kWh · Netz {{ grid|round(2) }} kWh · aktuelle Phase {{ current|round(2) }} kWh
+
+      _v0.4.4 lernt bewusst den Gesamtbedarf und nicht mehr nur die Batterieentnahme._
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_learned_total_energy_until_next_pv_charge
+      name: Gesamtbedarf
+    - type: tile
+      entity: sensor.adaptive_solar_controller_learned_battery_energy_until_next_pv_charge
+      name: Batterieanteil
+    - type: tile
+      entity: sensor.adaptive_solar_controller_learned_grid_energy_until_next_pv_charge
+      name: Netzanteil
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_current_energy_since_pv_charge_end
+      name: Aktuelle Phase
+    - type: tile
+      entity: sensor.adaptive_solar_controller_energy_demand_learning_confidence
+      name: Demand Confidence
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_energy_budget
+      name: Nutzbares Budget
+  - type: statistics-graph
+    entities:
+    - sensor.adaptive_solar_controller_current_energy_since_pv_charge_end
+    - sensor.adaptive_solar_controller_learned_total_energy_until_next_pv_charge
+    - sensor.adaptive_solar_controller_battery_energy_budget
+    title: Energieplanung
+    days_to_show: 7
+    period: 5minute
+    chart_type: line
+    stat_types: [mean]
+  - type: heading
+    heading: Kalibrierung & Flight Recorder
+    icon: mdi:tools
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: switch.adaptive_solar_controller_battery_calibration
+      name: Akku Kalibrierung
+      icon: mdi:battery-sync-outline
+    - type: tile
+      entity: sensor.adaptive_solar_controller_battery_calibration_state
+      name: Kalibrierstatus
+    - type: tile
+      entity: switch.adaptive_solar_controller_14_day_flight_recorder
+      name: 14-Tage Recorder
+      icon: mdi:airplane-clock
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_asc_event_marker
+      name: ASC Ereignis
+    - type: tile
+      entity: sensor.adaptive_solar_controller_flight_recorder_file
+      name: Recorder-Datei
+
+  - type: heading
+    heading: Prediction & Fast Controller
+    icon: mdi:speedometer
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_predicted_load
+      name: Last Prognose
+    - type: tile
+      entity: sensor.adaptive_solar_controller_prediction_confidence
+      name: Prediction Confidence
+    - type: tile
+      entity: sensor.adaptive_solar_controller_prediction_maturity
+      name: Prediction Reife
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_learned_response_gain
+      name: Response Gain
+    - type: tile
+      entity: sensor.adaptive_solar_controller_adaptive_deadband_export_side
+      name: Export Deadband
+    - type: tile
+      entity: sensor.adaptive_solar_controller_adaptive_deadband_import_side
+      name: Import Deadband
+  - type: statistics-graph
+    entities:
+    - sensor.e320_power_in
+    - input_number.inverter_target_power
+    - sensor.adaptive_solar_controller_recommended_target
+    - sensor.adaptive_solar_controller_effective_inverter_limit
+    title: ASC v0.4.4 Regelverlauf
+    days_to_show: 1
+    period: 5minute
+    chart_type: line
+    stat_types: [mean]
+  - type: heading
+    heading: Forecast & Saison
+    icon: mdi:weather-partly-cloudy
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_solar_forecast_trust
+      name: Forecast Trust
+    - type: tile
+      entity: sensor.adaptive_solar_controller_solar_forecast_correction_factor
+      name: Korrekturfaktor
+    - type: tile
+      entity: sensor.adaptive_solar_controller_solar_forecast_reputation
+      name: Reputation
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.adaptive_solar_controller_seasonal_confidence
+      name: Seasonal Confidence
+  - type: horizontal-stack
+    cards:
+    - type: tile
+      entity: sensor.energy_production_today_remaining_2
+      name: Forecast Rest heute
+    - type: tile
+      entity: sensor.energy_production_tomorrow_2
+      name: Forecast morgen
+    - type: tile
+      entity: sensor.power_production_next_12hours_2
+      name: Nächste 12 h
+
+- type: grid
+  cards:
+  - type: heading
+    heading: PV Strings / EPEVER
+    icon: mdi:solar-panel-large
+  - type: markdown
+    grid_options:
+      columns: 12
+      rows: 5
+    content: "{% set v1 = states('sensor.epever_tracer_1_battery_voltage') | float(0) %} {% set v2 = states('sensor.epever_tracer_2_battery_voltage') | float(0) %} {% set v3 = states('sensor.epever_tracer_3_battery_voltage') | float(0) %} {% set v4 = states('sensor.epever_tracer_4_battery_voltage') | float(0) %} {% set v5 = states('sensor.epever_tracer_5_battery_voltage') | float(0) %} {% set volts = [v1,v2,v3,v4,v5] %} {% set diff = (volts|max - volts|min) %}\n\n{% set p1 = states('sensor.epever_tracer_1_pv_array_input_power') | float(0) %} {% set p2 = states('sensor.epever_tracer_2_pv_array_input_power') | float(0) %} {% set p3 = states('sensor.epever_tracer_3_pv_array_input_power') | float(0) %} {% set p4 = states('sensor.epever_tracer_4_pv_array_input_power') | float(0) %} {% set p5 = states('sensor.epever_tracer_5_pv_array_input_power') | float(0) %}\n\n## ⚙️ EPEVER Diagnose\n\n**Batteriespannungen**\n\nT1 {{ v1|round(2) }} V · T2 {{ v2|round(2) }} V · T3 {{ v3|round(2) }} V · T4 {{ v4|round(2) }} V · T5 {{ v5|round(2) }} V\n\n{% if diff < 0.50 %} ✅ **Abweichung {{ diff|round(2) }} V** {% elif diff < 1.30 %} ⚠️ **Abweichung {{ diff|round(2) }} V** {% else %} 🚨 **Abweichung {{ diff|round(2) }} V – Verkabelung prüfen** {% endif %}\n\n**PV:** T1 {{ p1|round(0) }} W · T2 {{ p2|round(0) }} W · T3 {{ p3|round(0) }} W · T4 {{ p4|round(0) }} W · T5 {{ p5|round(0) }} W"
+  - type: custom:apexcharts-card
+    apex_config:
+      chart:
+        height: 350px
+    header:
+      show: true
+      title: String Ladestrom
+      show_states: true
+      colorize_states: true
+    series:
+    - entity: sensor.epever_tracer_1_charging_current
+      name: Tracer 1
+      type: area
+      group_by:
+        duration: 5min
+        func: avg
+    - entity: sensor.epever_tracer_2_charging_current
+      name: Tracer 2
+      type: area
+      group_by:
+        duration: 5min
+        func: avg
+    - entity: sensor.epever_tracer_3_charging_current
+      name: Tracer 3
+      type: area
+      group_by:
+        duration: 5min
+        func: avg
+    - entity: sensor.epever_tracer_4_charging_current
+      name: Tracer 4
+      type: area
+      group_by:
+        duration: 5min
+        func: avg
+    - entity: sensor.epever_tracer_5_charging_current
+      name: Tracer 5
+      type: area
+      group_by:
+        duration: 5min
+        func: avg
+  - type: custom:apexcharts-card
+    apex_config:
+      chart:
+        height: 350px
+    header:
+      show: true
+      title: String Batterie Ampere
+      show_states: true
+      colorize_states: true
+    series:
+    - entity: sensor.epever_tracer_1_battery_current
+      name: Tracer 1
+      type: area
+      group_by:
+        duration: 10min
+        func: avg
+    - entity: sensor.epever_tracer_2_battery_current
+      name: Tracer 2
+      type: area
+      group_by:
+        duration: 10min
+        func: avg
+    - entity: sensor.epever_tracer_3_battery_current
+      name: Tracer 3
+      type: area
+      group_by:
+        duration: 10min
+        func: avg
+    - entity: sensor.epever_tracer_4_battery_current
+      name: Tracer 4
+      type: area
+      group_by:
+        duration: 10min
+        func: avg
+    - entity: sensor.epever_tracer_5_battery_current
+      name: Tracer 5
+      type: area
+      group_by:
+        duration: 10min
+        func: avg
+  - type: custom:apexcharts-card
+    apex_config:
+      chart:
+        height: 350px
+    header:
+      show: true
+      title: String PV Leistung
+      show_states: true
+      colorize_states: true
+    series:
+    - entity: sensor.epever_tracer_1_pv_array_input_power
+      name: Tracer 1
+      group_by:
+        duration: 5min
+        func: avg
+    - entity: sensor.epever_tracer_2_pv_array_input_power
+      name: Tracer 2
+      group_by:
+        duration: 5min
+        func: avg
+    - entity: sensor.epever_tracer_3_pv_array_input_power
+      name: Tracer 3
+      group_by:
+        duration: 5min
+        func: avg
+    - entity: sensor.epever_tracer_4_pv_array_input_power
+      name: Tracer 4
+      group_by:
+        duration: 5min
+        func: avg
+    - entity: sensor.epever_tracer_5_pv_array_input_power
+      name: Tracer 5
+      group_by:
+        duration: 5min
+        func: avg
+  - type: custom:apexcharts-card
+    apex_config:
+      chart:
+        height: 300px
+    header:
+      show: true
+      title: String Erzeugung heute
+      show_states: true
+      colorize_states: true
+    series:
+    - entity: sensor.epever_tracer_1_generated_energy_today
+      name: Tracer 1
+      type: area
+    - entity: sensor.epever_tracer_2_generated_energy_today
+      name: Tracer 2
+      type: area
+    - entity: sensor.epever_tracer_3_generated_energy_today
+      name: Tracer 3
+      type: area
+    - entity: sensor.epever_tracer_4_generated_energy_today
+      name: Tracer 4
+      type: area
+    - entity: sensor.epever_tracer_5_generated_energy_today
+      name: Tracer 5
+      type: area
+  - type: custom:apexcharts-card
+    apex_config:
+      chart:
+        height: 300px
+    header:
+      show: true
+      title: String MPPT Spannung
+      show_states: true
+      colorize_states: true
+    series:
+    - entity: sensor.epever_tracer_1_pv_array_input_voltage
+      name: Tracer 1
+    - entity: sensor.epever_tracer_2_pv_array_input_voltage
+      name: Tracer 2
+    - entity: sensor.epever_tracer_3_pv_array_input_voltage
+      name: Tracer 3
+    - entity: sensor.epever_tracer_4_pv_array_input_voltage
+      name: Tracer 4
+    - entity: sensor.epever_tracer_5_pv_array_input_voltage
+      name: Tracer 5
+  - type: custom:apexcharts-card
+    graph_span: 24h
+    apex_config:
+      chart:
+        height: 350px
+    header:
+      show: true
+      title: Batterie Min / Max je Tracer
+      show_states: false
+      colorize_states: true
+    series:
+    - entity: sensor.epever_tracer_1_maximum_battery_voltage_today
+      name: T1 Max
+    - entity: sensor.epever_tracer_1_minimum_battery_voltage_today
+      name: T1 Min
+    - entity: sensor.epever_tracer_2_maximum_battery_voltage_today
+      name: T2 Max
+    - entity: sensor.epever_tracer_2_minimum_battery_voltage_today
+      name: T2 Min
+    - entity: sensor.epever_tracer_3_maximum_battery_voltage_today
+      name: T3 Max
+    - entity: sensor.epever_tracer_3_minimum_battery_voltage_today
+      name: T3 Min
+    - entity: sensor.epever_tracer_4_maximum_battery_voltage_today
+      name: T4 Max
+    - entity: sensor.epever_tracer_4_minimum_battery_voltage_today
+      name: T4 Min
+    - entity: sensor.epever_tracer_5_maximum_battery_voltage_today
+      name: T5 Max
+    - entity: sensor.epever_tracer_5_minimum_battery_voltage_today
+      name: T5 Min
+- type: grid
+  cards:
+  - type: heading
+    heading: Netz und System
+    icon: mdi:transmission-tower
+  - type: custom:modern-circular-gauge
+    entity: sensor.netzfrequenz
+    name: Netzfrequenz
+    min: 47.5
+    max: 52.5
+    needle: true
+    smooth_segments: false
+    adaptive_state_color: true
+    adaptive_icon_color: true
+    segments:
+    - from: 47.5
+      color:
+      - 68
+      - 68
+      - 68
+    - from: 48.1
+      color:
+      - 108
+      - 108
+      - 108
+    - from: 48.4
+      color:
+      - 136
+      - 136
+      - 136
+    - from: 48.7
+      color:
+      - 166
+      - 166
+      - 166
+    - from: 49
+      color:
+      - 255
+      - 128
+      - 0
+    - from: 49.8
+      color:
+      - 255
+      - 255
+      - 0
+    - from: 49.99
+      color:
+      - 0
+      - 128
+      - 0
+    - from: 50.01
+      color:
+      - 255
+      - 255
+      - 0
+    - from: 50.2
+      color:
+      - 0
+      - 0
+      - 255
+    - from: 51.5
+      color:
+      - 128
+      - 128
+      - 128
+    grid_options:
+      columns: 12
+      rows: 4
+  - type: gauge
+    entity: sensor.shelly_pm_2_voltage
+    name: Netzspannung
+    min: 207
+    max: 253
+    needle: true
+    severity:
+      green: 213
+      yellow: 207
+      red: 248
+  - type: gauge
+    entity: sensor.inverter_abweichung_durchschnitt
+    name: Inverter Abweichung
+    min: -20
+    max: 20
+  - type: entities
+    title: Ladezustände
+    state_color: true
+    entities:
+    - entity: sensor.epever_tracer1_charge_state
+      name: Tracer 1
+    - entity: sensor.epever_tracer2_charge_state
+      name: Tracer 2
+    - entity: sensor.epever_tracer3_charge_state
+      name: Tracer 3
+    - entity: sensor.epever_tracer4_charge_state
+      name: Tracer 4
+    - entity: sensor.epever_tracer5_charge_state
+      name: Tracer 5
+  - type: heading
+    heading: System Effizienz
+    icon: mdi:gauge
+  - type: horizontal-stack
+    cards:
+    - type: gauge
+      entity: sensor.jahres_effizienz_solarsystem
+      name: Solar
+    - type: gauge
+      entity: sensor.jahres_effizienz_akkusystem
+      name: Akku
+    - type: gauge
+      entity: sensor.jahres_effizienz_invertersystem
+      name: Inverter
+  - type: statistics-graph
+    entities:
+    - sensor.jahres_effizienz_solarsystem
+    - sensor.jahres_effizienz_akkusystem
+    - sensor.jahres_effizienz_invertersystem
+    title: System Effizienz 30 Tage
+    days_to_show: 30
+    period: 5minute
+    chart_type: line
+    stat_types:
+    - mean
+    hide_legend: false
+    expand_legend: false
+background:
+  opacity: 100
+  alignment: center
+  size: cover
+  repeat: repeat
+  attachment: scroll
+  image: /api/image/serve/5aba883345822faa346fed563e737caa/original
+cards: []
+
+# ASC v0.4.6 Feature Preview – append to existing dashboard views/cards as desired.

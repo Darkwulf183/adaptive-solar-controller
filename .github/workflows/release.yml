@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Optional: Zweig, Tag oder Commit, aus dem das Release gebaut wird (leer = main), z. B. release-0.4.6rc4"
+        type: string
+        default: ""
+      replace:
+        description: "Vorhandenes Release mit gleicher Version samt Tag löschen und neu anlegen"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Version aus manifest.json lesen
+        id: v
+        run: |
+          VERSION=$(python3 -c "import json;print(json.load(open('custom_components/adaptive_solar_controller/manifest.json'))['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          case "$VERSION" in
+            *rc*|*dev*|*a[0-9]*|*b[0-9]*) echo "pre=--prerelease" >> "$GITHUB_OUTPUT" ;;
+            *) echo "pre=" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Vorhandenes Release prüfen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+          REPLACE: ${{ inputs.replace }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            if [ "$REPLACE" = "true" ]; then
+              gh release delete "$TAG" --cleanup-tag --yes
+            else
+              echo "Release $TAG existiert bereits. Version in manifest.json erhöhen oder 'replace' wählen." >&2
+              exit 1
+            fi
+          fi
+
+      - name: ZIP packen
+        run: |
+          cd custom_components/adaptive_solar_controller
+          zip -r ../../adaptive_solar_controller.zip . -x "__pycache__/*" "*.pyc"
+
+      - name: Release erstellen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+          VERSION: ${{ steps.v.outputs.version }}
+          PRE: ${{ steps.v.outputs.pre }}
+        run: |
+          gh release create "$TAG" adaptive_solar_controller.zip \
+            --target "$(git rev-parse HEAD)" \
+            --title "Adaptive Solar Controller $VERSION" \
+            --notes-file .github/release-notes.md \
+            $PRE

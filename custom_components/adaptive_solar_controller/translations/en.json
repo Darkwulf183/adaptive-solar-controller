@@ -1,0 +1,114 @@
+{
+  "title": "Adaptive Solar Controller",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Adaptive Solar Controller",
+        "description": "ASC v0.4 plans the battery using energy budget, full confidence, forecast trust and seasonal production. The old battery-high/max-limit helpers are no longer needed.",
+        "data": {
+          "grid_sensor": "Grid power",
+          "pv_sensor": "PV power (real)",
+          "daily_production_sensor": "PV daily production (seasonal learning)",
+          "battery_voltage_sensor": "Battery voltage",
+          "battery_current_sensor": "Battery current",
+          "battery_power_sensor": "Battery power (optional)",
+          "inverter_output_sensor": "Main inverter actual output",
+          "target_helper": "Inverter target helper",
+          "battery_low_helper": "Battery hard-low helper",
+          "backup_inverter": "Backup inverter set power",
+          "solar_enable": "Solar release / input solar",
+          "forecast_power_now": "Forecast.Solar power now",
+          "forecast_power_next_hour": "Forecast.Solar power in 1 hour",
+          "forecast_energy_next_hour": "Forecast.Solar energy next hour",
+          "forecast_energy_today": "Forecast.Solar energy today",
+          "forecast_energy_remaining": "Forecast.Solar energy remaining today",
+          "forecast_energy_tomorrow": "Forecast.Solar energy tomorrow",
+          "forecast_peak_time_today": "Forecast.Solar peak time today",
+          "grid_target": "Desired grid import",
+          "backup_block_w": "Block when backup output above",
+          "min_target_w": "Minimum inverter target",
+          "max_step_w": "Maximum normal change per cycle",
+          "hard_max_w": "Absolute inverter maximum power",
+          "inverter_power_switch": "Inverter power switch (optional, for emergency cutoff/FULL hold)",
+          "absorption_voltage_v": "Absorption voltage",
+          "absorption_tolerance_v": "Absorption tolerance",
+          "absorption_minutes": "Absorption time for FULL"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Adaptive Solar Controller",
+        "description": "Re-map plant, forecast and limits. Learned ASC knowledge is kept.",
+        "data": {
+          "grid_sensor": "Grid power",
+          "pv_sensor": "PV power (real)",
+          "daily_production_sensor": "PV daily production (seasonal learning)",
+          "battery_voltage_sensor": "Battery voltage",
+          "battery_current_sensor": "Battery current",
+          "battery_power_sensor": "Battery power (optional)",
+          "inverter_output_sensor": "Main inverter actual output",
+          "target_helper": "Inverter target helper",
+          "battery_low_helper": "Battery hard-low helper",
+          "backup_inverter": "Backup inverter set power",
+          "solar_enable": "Solar release / input solar",
+          "forecast_power_now": "Forecast.Solar power now",
+          "forecast_power_next_hour": "Forecast.Solar power in 1 hour",
+          "forecast_energy_next_hour": "Forecast.Solar energy next hour",
+          "forecast_energy_today": "Forecast.Solar energy today",
+          "forecast_energy_remaining": "Forecast.Solar energy remaining today",
+          "forecast_energy_tomorrow": "Forecast.Solar energy tomorrow",
+          "forecast_peak_time_today": "Forecast.Solar peak time today",
+          "grid_target": "Desired grid import",
+          "backup_block_w": "Block when backup output above",
+          "min_target_w": "Minimum inverter target",
+          "max_step_w": "Maximum normal change per cycle",
+          "hard_max_w": "Absolute inverter maximum power",
+          "inverter_power_switch": "Inverter power switch (optional, for emergency cutoff/FULL hold)",
+          "absorption_voltage_v": "Absorption voltage",
+          "absorption_tolerance_v": "Absorption tolerance",
+          "absorption_minutes": "Absorption time for FULL"
+        }
+      }
+    },
+    "abort": {
+      "reconfigure_successful": "Reconfiguration successful.",
+      "already_configured": "ASC is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Adaptive Solar Controller options",
+        "description": "Changes are applied after saving (the integration reloads).",
+        "data": {
+          "grid_sensor": "Grid power",
+          "pv_sensor": "PV power (real)",
+          "daily_production_sensor": "PV daily production (seasonal learning)",
+          "battery_voltage_sensor": "Battery voltage",
+          "battery_current_sensor": "Battery current",
+          "battery_power_sensor": "Battery power (optional)",
+          "inverter_output_sensor": "Main inverter actual output",
+          "target_helper": "Inverter target helper",
+          "battery_low_helper": "Battery hard-low helper",
+          "backup_inverter": "Backup inverter set power",
+          "solar_enable": "Solar release / input solar",
+          "forecast_power_now": "Forecast.Solar power now",
+          "forecast_power_next_hour": "Forecast.Solar power in 1 hour",
+          "forecast_energy_next_hour": "Forecast.Solar energy next hour",
+          "forecast_energy_today": "Forecast.Solar energy today",
+          "forecast_energy_remaining": "Forecast.Solar energy remaining today",
+          "forecast_energy_tomorrow": "Forecast.Solar energy tomorrow",
+          "forecast_peak_time_today": "Forecast.Solar peak time today",
+          "grid_target": "Desired grid import",
+          "backup_block_w": "Block when backup output above",
+          "min_target_w": "Minimum inverter target",
+          "max_step_w": "Maximum normal change per cycle",
+          "hard_max_w": "Absolute inverter maximum power",
+          "inverter_power_switch": "Inverter power switch (optional, for emergency cutoff/FULL hold)",
+          "absorption_voltage_v": "Absorption voltage",
+          "absorption_tolerance_v": "Absorption tolerance",
+          "absorption_minutes": "Absorption time for FULL"
+        }
+      }
+    }
+  }
+}

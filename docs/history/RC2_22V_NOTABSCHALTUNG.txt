@@ -1,0 +1,6 @@
+ASC v0.4.6 RC2 - NOT FINAL / MONITOR TEST ONLY
+
+Added persistent slider "Battery emergency terminal cutoff voltage" (20.0-25.0 V, step 0.1 V, default 22.0 V).
+This is independent of the rebound-based cutoff (default 22.8 V). The emergency limit checks measured voltage under load.
+WARNING: The physical inverter switch must be configured to ensure shutdown. The backup inverter is not yet controlled by ASC.
+No real Home Assistant/hardware test was performed. RC2 is not cleared for unattended battery discharge.
