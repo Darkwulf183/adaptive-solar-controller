@@ -9,7 +9,7 @@ sections:
     heading: Solar Anlage
     icon: mdi:solar-power
   - type: entities
-    title: ASC v0.4.6 · FULL Absorptionszeit
+    title: ASC · FULL Absorptionszeit
     show_header_toggle: false
     entities:
       - entity: sensor.adaptive_solar_controller_full_absorption_elapsed
@@ -23,7 +23,7 @@ sections:
       - entity: sensor.adaptive_solar_controller_full_anchor_source
         name: Letzter FULL-Anker
   - type: entities
-    title: ASC v0.4.6 · LOW-Recovery und Sicherheit
+    title: ASC · LOW-Recovery und Sicherheit
     show_header_toggle: false
     entities:
       - entity: select.adaptive_solar_controller_low_recovery_calibration_mode
@@ -308,7 +308,7 @@ sections:
     - entity: input_number.inverter_max_limit
       name: Inverter Limit
   - type: heading
-    heading: ASC v0.4.4 · Estimator → Planner → Fast Controller
+    heading: ASC · Estimator → Planner → Fast Controller
     icon: mdi:brain
   - type: markdown
     content: >
@@ -320,7 +320,7 @@ sections:
       {% set limit = states('sensor.adaptive_solar_controller_effective_inverter_limit') | float(0) %}
       {% set reserve = states('sensor.adaptive_solar_controller_estimated_battery_reserve') | float(0) %}
       {% set reserve_target = states('sensor.adaptive_solar_controller_target_reserve_at_next_pv_charge') | float(0) %}
-      ## 🧠 ASC v0.4.4 · {{ status }}
+      ## 🧠 ASC · {{ status }}
       **Netz:** {{ grid|round(0) }} W · **Soll:** {{ target|round(0) }} W · **Planner-Limit:** {{ limit|round(0) }} W
 
       **Planner:** {{ plan }} · {{ reason }}
@@ -364,7 +364,7 @@ sections:
       name: Planner Grund
 
   - type: heading
-    heading: ASC v0.4.4 · Strategy Learner
+    heading: ASC · Strategy Learner
     icon: mdi:chart-bell-curve-cumulative
   - type: horizontal-stack
     cards:
@@ -413,7 +413,7 @@ sections:
       max: 20
 
   - type: heading
-    heading: Battery Energy · v0.4.4
+    heading: Battery Energy 
     icon: mdi:battery-heart-variant
   - type: horizontal-stack
     cards:
@@ -532,7 +532,7 @@ sections:
       ## 🌙 Gelernter Gesamtbedarf **{{ total|round(2) }} kWh**
       Akku {{ batt|round(2) }} kWh · Netz {{ grid|round(2) }} kWh · aktuelle Phase {{ current|round(2) }} kWh
 
-      _v0.4.4 lernt bewusst den Gesamtbedarf und nicht mehr nur die Batterieentnahme._
+      _ASC lernt bewusst den Gesamtbedarf und nicht mehr nur die Batterieentnahme._
   - type: horizontal-stack
     cards:
     - type: tile
@@ -621,7 +621,7 @@ sections:
     - input_number.inverter_target_power
     - sensor.adaptive_solar_controller_recommended_target
     - sensor.adaptive_solar_controller_effective_inverter_limit
-    title: ASC v0.4.4 Regelverlauf
+    title: ASC Regelverlauf
     days_to_show: 1
     period: 5minute
     chart_type: line
@@ -991,4 +991,4 @@ background:
   image: /api/image/serve/5aba883345822faa346fed563e737caa/original
 cards: []
 
-# ASC v0.4.6 Feature Preview – append to existing dashboard views/cards as desired.
+# ASC Feature Preview – append to existing dashboard views/cards as desired.

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfElectricPotential, UnitOfPower
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfEnergy, UnitOfElectricPotential, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -131,6 +131,7 @@ SENSORS = [
 
     # Diagnostics
     ASCSensorDescription(key="flight_recorder_path", name="Flight recorder file", icon="mdi:file-delimited-outline", data_key="flight_recorder_path"),
+    ASCSensorDescription(key="version", name="ASC version", icon="mdi:tag-outline", entity_category=EntityCategory.DIAGNOSTIC, data_key="version"),
     ASCSensorDescription(key="events", name="ASC event marker", icon="mdi:flag-outline", data_key="events"),
     ASCSensorDescription(key="controller_state", name="Controller state", icon="mdi:information-outline", data_key="status"),
     ASCSensorDescription(key="blocked_reason", name="Blocked reason", icon="mdi:shield-alert-outline", data_key="blocked_reason"),

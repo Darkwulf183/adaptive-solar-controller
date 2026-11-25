@@ -23,6 +23,10 @@ Nur im Zweig `dev` und als ZIP; `.storage` vor dem Test sichern.
   `LOW_ANCHOR_REJECTED_NO_FULL` abgelehnt.
 - **Neuer Knopf** *Reset learned full charge voltage*: setzt den gelernten FULL-Wert auf 28,8 V und lernt ihn neu (statt `.storage` zu bearbeiten).
 
+### Versionsnummer
+- Einzige Quelle ist `manifest.json`; `const.py` liest sie von dort. Das Panel zeigt die laufende Version (neuer Diagnose-Sensor *ASC version*)
+  statt einer festen Angabe. Das Dashboard-Beispiel enthält keine Versionsnummern mehr. Ein Test prüft Manifest, CHANGELOG und (bei Releases) die README.
+
 ### Flight Recorder
 - Neue Spalten `emergency_reserve`, `cutoff_credit_v`, `cutoff_relaxed_v` (angerechnete Erholung / geschätzte entspannte Spannung der Notabschaltung).
   Hinweis: Wegen der geänderten Spalten wird die heutige Datei beim ersten Start als `_old.csv` abgelegt und neu begonnen.

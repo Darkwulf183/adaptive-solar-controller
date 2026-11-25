@@ -1,7 +1,19 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+
+def _read_version() -> str:
+    """manifest.json is the single source of truth for the version number."""
+    try:
+        return str(json.loads((Path(__file__).parent / "manifest.json").read_text(encoding="utf-8"))["version"])
+    except (OSError, ValueError, KeyError):
+        return "unknown"
+
+
 DOMAIN = "adaptive_solar_controller"
-VERSION = "0.4.8dev1"
+VERSION = _read_version()
 PLATFORMS = ["sensor", "select", "switch", "number", "binary_sensor", "button"]
 
 CONF_GRID_SENSOR = "grid_sensor"

@@ -1,4 +1,4 @@
-/* Adaptive Solar Controller – Sidebar-Panel (v0.4.6 RC4, Design 2)
+/* Adaptive Solar Controller – Sidebar-Panel (Design 2; Version kommt aus sensor.adaptive_solar_controller_asc_version)
  * Tabs: Übersicht · Planer & Prognose · Batterie & Lernen · Sicherheit · Steuerung
  * Alle Entity-IDs, Services und der CSV-Import sind unverändert zur Vorversion.
  */
@@ -387,7 +387,7 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
     const html = `<style>${this.css()}</style><div class="w">
       <header class="hero">
         <img class="logo" src="/asc_static/asc-icon.png" alt="">
-        <div class="ht"><h1>Adaptive Solar Controller</h1><div class="sub">v0.4.6 RC4 · Estimator → Strategy Learner → Energy Planner → Fast Controller</div></div>
+        <div class="ht"><h1>Adaptive Solar Controller</h1><div class="sub">${this.esc(this.ver())} · Estimator → Strategy Learner → Energy Planner → Fast Controller</div></div>
         <button class="back" type="button">← Solar</button>
       </header>
       <div class="pills">
@@ -401,7 +401,7 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
       ${this.alerts()}
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${this._tab === k}" class="${this._tab === k ? "active" : ""}" data-tab="${k}">${l}</button>`).join("")}</nav>
       <main role="tabpanel">${body}</main>
-      <footer class="foot">ASC v0.4.6 RC4 · Adaptive Energy Strategy · Darkwulf183 &amp; ChatGPT</footer></div>`;
+      <footer class="foot">ASC ${this.esc(this.ver())} · Adaptive Energy Strategy · Darkwulf183 &amp; ChatGPT</footer></div>`;
     this._apply(html);
     // Persistente Dateiauswahl: dasselbe <input> wird bei jedem Neuzeichnen wieder eingesetzt.
     if (!this._fileInput) {
@@ -478,6 +478,11 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
     else if (t.dataset.e) this.info(t.dataset.e);
   }
   _onChange(e) { if (e.target?.id === "pv-csv-replace") this._csvReplace = e.target.checked; }
+
+  ver() {
+    const v = this._hass?.states?.["sensor.adaptive_solar_controller_asc_version"]?.state;
+    return v && v !== "unknown" && v !== "unavailable" ? "v" + v : "v?";
+  }
 
   async recList() {
     this._recStatus = "Liste wird geladen …"; this._sig = null; this.render();
