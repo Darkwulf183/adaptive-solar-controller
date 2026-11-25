@@ -15,6 +15,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         ControllerEnableSwitch(c, entry),
         FlightRecorderSwitch(c, entry),
         BatteryCalibrationSwitch(c, entry),
+        EmergencyReserveSwitch(c, entry),
     ])
 
 
@@ -54,3 +55,13 @@ class BatteryCalibrationSwitch(_BaseSwitch):
     def is_on(self): return self.coordinator.controller.state.battery_calibration_enabled
     async def async_turn_on(self, **kwargs): await self.coordinator.async_set_battery_calibration(True); self.async_write_ha_state()
     async def async_turn_off(self, **kwargs): await self.coordinator.async_set_battery_calibration(False); self.async_write_ha_state()
+
+
+class EmergencyReserveSwitch(_BaseSwitch):
+    """Notstrom-Vorsorge: ASC inverter stays off, the battery is kept full by PV."""
+    _attr_name = "Emergency power reserve"; _attr_icon = "mdi:battery-heart-variant"
+    def __init__(self, coordinator, entry): super().__init__(coordinator, entry, "emergency_reserve")
+    @property
+    def is_on(self): return self.coordinator.controller.state.emergency_reserve_enabled
+    async def async_turn_on(self, **kwargs): await self.coordinator.async_set_emergency_reserve(True); self.async_write_ha_state()
+    async def async_turn_off(self, **kwargs): await self.coordinator.async_set_emergency_reserve(False); self.async_write_ha_state()

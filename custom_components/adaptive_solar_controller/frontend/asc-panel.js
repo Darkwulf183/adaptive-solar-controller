@@ -368,7 +368,13 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
       <label class="chk"><input type="checkbox" id="pv-csv-replace" ${this._csvReplace ? "checked" : ""}> Vorhandene Tage ersetzen (sonst bleiben sie unverändert)</label>
       <div class="btns"><button id="pv-csv-preview">CSV prüfen</button><button id="pv-csv-commit" class="primary">Import bestätigen</button></div>
       <p id="pv-csv-status" class="hint">${this.esc(this._csvStatus || "Bis zu 3 MB / 1100 Tage. Panel-Konfiguration benötigt entry_id.")}</p>`, { icon: "📁", cls: "wide" });
-    return `<div class="cols">${ctrl}${fast}${diag}${csv}</div>`;
+    const files = this._recFiles;
+    const recCard = this.card("Flight Recorder · Download", `
+      <p class="hint top">Die täglichen CSV-Dateien herunterladen (nur Administratoren). Neueste zuerst.</p>
+      <div class="btns"><button id="rec-refresh">Liste laden</button></div>
+      ${files && files.length ? files.slice(0, 20).map((f) => `<div class="row"><span>${this.esc(f.name.replace(/^ASC_v[^_]+_FlightRecorder_/, "").replace(/\.csv$/, ""))} · ${(f.size / 1048576).toFixed(1)} MB</span><b><button data-rec="${this.esc(f.name)}">Herunterladen</button></b></div>`).join("") : ""}
+      <p id="rec-status" class="hint">${this.esc(this._recStatus || (files ? (files.length ? "" : "Keine Dateien gefunden.") : "Mit „Liste laden“ die vorhandenen Dateien anzeigen."))}</p>`, { icon: "✈️", cls: "wide" });
+    return `<div class="cols">${ctrl}${fast}${diag}${recCard}${csv}</div>`;
   }
 
   /* ---------- Render ---------- */
@@ -458,18 +464,44 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
   }
 
   _onClick(e) {
-    const t = e.target.closest("[data-e],[data-m],[data-c],[data-t],[data-tab],.back,#pv-csv-preview,#pv-csv-commit");
+    const t = e.target.closest("[data-e],[data-m],[data-c],[data-t],[data-tab],[data-rec],.back,#pv-csv-preview,#pv-csv-commit,#rec-refresh");
     if (!t) return;
     if (t.dataset.tab) { this._tab = t.dataset.tab; this._tabChanged = true; this._sig = null; this.render(); }
     else if (t.dataset.m) this.mode(t.dataset.m);
     else if (t.dataset.c) this.chem(t.dataset.c);
     else if (t.dataset.t) this.toggle(t.dataset.t);
     else if (t.classList.contains("back")) window.location.href = "/dashboard-solar/solar";
+    else if (t.dataset.rec) this.recDownload(t.dataset.rec);
+    else if (t.id === "rec-refresh") this.recList();
     else if (t.id === "pv-csv-preview") this.csvImport(false);
     else if (t.id === "pv-csv-commit") this.csvImport(true);
     else if (t.dataset.e) this.info(t.dataset.e);
   }
   _onChange(e) { if (e.target?.id === "pv-csv-replace") this._csvReplace = e.target.checked; }
+
+  async recList() {
+    this._recStatus = "Liste wird geladen …"; this._sig = null; this.render();
+    try {
+      const r = await this._hass.callWS({ type: "adaptive_solar_controller/recorder_list" });
+      this._recFiles = r.files || []; this._recStatus = "";
+    } catch (e) { this._recStatus = "Liste nicht verfügbar: " + (e.message || String(e)); }
+    this._sig = null; this.render();
+  }
+
+  async recDownload(name) {
+    this._recStatus = "Lade " + name + " …"; this._sig = null; this.render();
+    try {
+      const token = this._hass.auth?.data?.access_token;
+      const res = await fetch("/api/adaptive_solar_controller/recorder/" + encodeURIComponent(name), { headers: token ? { Authorization: "Bearer " + token } : {} });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      this._recStatus = name + " heruntergeladen.";
+    } catch (e) { this._recStatus = "Download fehlgeschlagen: " + (e.message || String(e)); }
+    this._sig = null; this.render();
+  }
 
   async csvImport(commit = false) {
     const replace = !!this._csvReplace;

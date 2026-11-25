@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.8 dev1 (Teststand, nicht veröffentlicht)
+
+Notstrom-Vorsorge, zwei Lernfehler-Korrekturen aus dem Flight Recorder (24./25.11.2026), Recorder-Erweiterungen.
+Nur im Zweig `dev` und als ZIP; `.storage` vor dem Test sichern.
+
+### Notstrom-Vorsorge (neu)
+- Neuer Schalter **Emergency power reserve**. Ist er an, schaltet ASC den konfigurierten Wechselrichter-Schalter aus und lässt ihn aus;
+  der Akku wird nur noch per PV geladen und bleibt voll (z. B. vor einem Sturm oder erwarteten Stromausfall). Nur dieser Schalter wird bedient.
+- Schaltest du den Wechselrichter von Hand wieder ein (Notfall), respektiert ASC das (`emergency_manual_on`) und schaltet ihn nicht wieder aus,
+  bis du ihn selbst wieder ausgeschaltet hast. Kein automatisches Einschalten bei Netzausfall.
+- Schaltest du die Notstrom-Vorsorge aus, übernimmt die normale FULL-Sperre: der Wechselrichter wird erst nach bestätigtem FULL wieder eingeschaltet.
+- Die Batterie-Notabschaltung (Unterspannung) hat weiterhin Vorrang.
+- Statuswerte im Recorder (`inverter_switch_action`): `emergency_off`, `emergency_turn_off_confirmed`, `emergency_turn_off_pending`,
+  `emergency_already_off`, `emergency_manual_on`. Neue Recorder-Spalte `emergency_reserve`.
+
+### Lernen
+- **FULL-Spitzenwert:** `full_charge_peak_v` gilt nur noch für die laufende Ladephase und darf den gelernten Wert höchstens um 0,3 V überschreiten.
+  Ein einmaliger Ausreißer zieht den gelernten FULL-Wert nicht mehr bei jeder Ladung wieder hoch (dadurch wurde FULL im November nicht mehr erkannt).
+- **FULL-Zyklus:** Eine kurze PV-Zwischenladung beendet den FULL-Zyklus nicht mehr. Die Entladung seit FULL wird netto gerechnet
+  (Ladung zieht ab). Ein FULL-Anker gilt bis 5 Tage. Damit werden Niedrig-Anker und Kapazitätslernen nicht mehr mit
+  `LOW_ANCHOR_REJECTED_NO_FULL` abgelehnt.
+- **Neuer Knopf** *Reset learned full charge voltage*: setzt den gelernten FULL-Wert auf 28,8 V und lernt ihn neu (statt `.storage` zu bearbeiten).
+
+### Flight Recorder
+- Neue Spalten `emergency_reserve`, `cutoff_credit_v`, `cutoff_relaxed_v` (angerechnete Erholung / geschätzte entspannte Spannung der Notabschaltung).
+  Hinweis: Wegen der geänderten Spalten wird die heutige Datei beim ersten Start als `_old.csv` abgelegt und neu begonnen.
+- Pausierte Zyklen (z. B. `solar_release_off`, `sensor_invalid`, `warmup_after_enable`) schreiben jetzt eine schlanke Zeile (höchstens alle 60 s), Ereignis `PAUSED:<Grund>`.
+- Panel (Steuerung): Kachel *Flight Recorder · Download* zum Herunterladen der CSV-Dateien (nur Administratoren).
+
 ## 0.4.7 RC1
 
 Fehlerbehebung an der FULL-Sperre, Abschaltbestätigung und Start-Marker im Flight Recorder.

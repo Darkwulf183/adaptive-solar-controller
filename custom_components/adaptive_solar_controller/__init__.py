@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.http import HomeAssistantView, StaticPathConfig
+from aiohttp import web
 from homeassistant.components import websocket_api
 import voluptuous as vol
 from datetime import date
@@ -13,6 +14,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import CONF_DAILY_PRODUCTION_SENSOR, DOMAIN, PLATFORMS
 from .coordinator import AdaptiveSolarCoordinator
+from .recorder_files import FOLDER as RECORDER_FOLDER, list_files, resolve
 
 STATIC_URL = "/asc_static"
 
@@ -52,6 +54,39 @@ async def async_pv_csv(hass, connection, msg):
         connection.send_error(msg["id"], "invalid_csv", str(exc))
 
 
+@websocket_api.websocket_command({vol.Required("type"): "adaptive_solar_controller/recorder_list"})
+@websocket_api.async_response
+async def async_recorder_list(hass, connection, msg):
+    if not connection.user.is_admin:
+        connection.send_error(msg["id"], "unauthorized", "Administrator required")
+        return
+    folder = Path(hass.config.path(RECORDER_FOLDER))
+    files = await hass.async_add_executor_job(list_files, folder)
+    connection.send_result(msg["id"], {"files": files})
+
+
+class RecorderDownloadView(HomeAssistantView):
+    """Download one flight recorder CSV (administrators only)."""
+
+    url = "/api/adaptive_solar_controller/recorder/{name}"
+    name = "api:adaptive_solar_controller:recorder"
+    requires_auth = True
+
+    async def get(self, request, name: str):
+        hass = request.app["hass"]
+        user = request.get("hass_user")
+        if user is None or not user.is_admin:
+            return web.Response(status=403, text="Administrator required")
+        folder = Path(hass.config.path(RECORDER_FOLDER))
+        path = await hass.async_add_executor_job(resolve, folder, name)
+        if path is None:
+            return web.Response(status=404, text="Not found")
+        return web.FileResponse(path, headers={
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": f'attachment; filename="{path.name}"',
+            "Cache-Control": "no-store",
+        })
+
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate old config entries without deleting learned storage."""
@@ -74,6 +109,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         domain_data["_static_registered"] = True
     if not domain_data.get("_pv_ws_registered"):
         websocket_api.async_register_command(hass, async_pv_csv)
+        websocket_api.async_register_command(hass, async_recorder_list)
+        hass.http.register_view(RecorderDownloadView())
         domain_data["_pv_ws_registered"] = True
     coordinator = AdaptiveSolarCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()

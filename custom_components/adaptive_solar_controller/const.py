@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 DOMAIN = "adaptive_solar_controller"
-VERSION = "0.4.7rc1"
-PLATFORMS = ["sensor", "select", "switch", "number", "binary_sensor"]
+VERSION = "0.4.8dev1"
+PLATFORMS = ["sensor", "select", "switch", "number", "binary_sensor", "button"]
 
 CONF_GRID_SENSOR = "grid_sensor"
 CONF_PV_SENSOR = "pv_sensor"

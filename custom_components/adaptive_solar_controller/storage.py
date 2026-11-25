@@ -207,6 +207,7 @@ class LearningState:
     lead_full_target_days: float = 7.0
     planning_confidence_ema: float = -1.0
     inverter_full_lock_owned: bool = False
+    emergency_reserve_enabled: bool = False  # v0.4.8 Notstrom-Vorsorge (manual switch)
     inverter_full_lock_entity: str = ""
     battery_energy_charged_total_kwh: float = 0.0
     battery_energy_discharged_total_kwh: float = 0.0

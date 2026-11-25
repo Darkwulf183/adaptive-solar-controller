@@ -28,6 +28,7 @@ FIELDS = [
     "full_charge_priority","full_charge_opportunity","chemistry_strategy_state","days_since_full",
     "absorption_elapsed_min","absorption_required_min","absorption_remaining_min","absorption_status","full_anchor_source",
     "calibration_state","blocked_reason","inverter_power_switch","inverter_switch_state","inverter_full_lock_owned","inverter_switch_action",
+    "emergency_reserve","cutoff_credit_v","cutoff_relaxed_v",
 ]
 
 

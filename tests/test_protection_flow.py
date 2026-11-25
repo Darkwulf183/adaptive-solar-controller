@@ -281,5 +281,74 @@ class TrackerUnit(unittest.TestCase):
         self.assertEqual(t.observe("off", 22), "idle")
 
 
+class EmergencyReserveFlow(unittest.TestCase):
+    """Notstrom-Vorsorge: Wechselrichter bleibt aus, Handeinschalten wird respektiert."""
+    def setUp(self):
+        self.clock = Clock()
+        self._orig = coord_mod.time.monotonic
+        coord_mod.time.monotonic = self.clock
+        NOTES.created.clear(); NOTES.dismissed.clear()
+
+    def tearDown(self): coord_mod.time.monotonic = self._orig
+
+    def cycle(self, c, chem="healthy", mode="adaptive"):
+        r = run(c._async_manage_full_lock(chem, mode))
+        self.clock.advance(10)
+        return r
+
+    def make(self, switch_state="on"):
+        c = make(switch_state)
+        c.controller.state.emergency_reserve_enabled = True
+        c._emergency_manual_on = False
+        return c
+
+    def test_switches_inverter_off_without_any_full_lock_need(self):
+        c = self.make()
+        self.assertEqual(self.cycle(c), "turn_off_sent")
+        self.assertEqual(self.cycle(c), "emergency_turn_off_confirmed")
+        self.assertEqual(self.cycle(c), "emergency_off")
+
+    def test_already_off_is_left_alone(self):
+        c = self.make("off")
+        self.assertEqual(self.cycle(c), "emergency_already_off")
+        self.assertEqual(c.hass.calls, [])
+
+    def test_manual_switch_on_is_respected(self):
+        c = self.make()
+        self.cycle(c); self.cycle(c)
+        c.hass.set(SWITCH, "on")                                   # Benutzer braucht den Wechselrichter
+        self.assertEqual(self.cycle(c), "emergency_manual_on")
+        n = len(c.hass.calls)
+        for _ in range(5):
+            self.assertEqual(self.cycle(c), "emergency_manual_on")
+        self.assertEqual(len(c.hass.calls), n)                     # ASC schaltet nicht wieder aus
+
+    def test_takes_over_again_after_user_switched_off(self):
+        c = self.make()
+        self.cycle(c); self.cycle(c)
+        c.hass.set(SWITCH, "on"); self.cycle(c)
+        c.hass.set(SWITCH, "off")
+        self.assertEqual(self.cycle(c), "emergency_already_off")
+        c.hass.set(SWITCH, "on")
+        self.assertEqual(self.cycle(c), "turn_off_sent")
+
+    def test_monitor_mode_does_not_switch(self):
+        c = self.make()
+        self.assertEqual(self.cycle(c, mode="monitor"), "monitor_no_action")
+        self.assertEqual(c.hass.calls, [])
+
+    def test_unavailable_switch_waits(self):
+        c = self.make("unavailable")
+        self.assertEqual(self.cycle(c), "switch_unavailable")
+
+    def test_disabled_reserve_hands_back_to_the_normal_lock(self):
+        c = self.make()
+        self.cycle(c); self.cycle(c)
+        c.controller.state.emergency_reserve_enabled = False
+        # Besitzmarke bleibt; ohne bestätigtes FULL wird nicht eingeschaltet
+        self.assertEqual(self.cycle(c, chem="lead_pre_full"), "awaiting_confirmed_full")
+        self.assertEqual([x for x in c.hass.calls if x[1] == "turn_on"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

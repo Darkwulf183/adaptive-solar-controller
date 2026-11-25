@@ -51,6 +51,10 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         self._safety_lock = asyncio.Lock()
         self._last_cutoff_status = "ok"
         self._cutoff_notified = False
+        self._emergency_manual_on = False
+        self._last_credit_v = None
+        self._last_relaxed_v = None
+        self._last_pause_record = 0.0
         self._passive_cache = None
 
 
@@ -333,6 +337,20 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         self.controller.reset_transient()
         await self.store.async_save(state); await self.async_request_refresh()
 
+    async def async_reset_full_voltage(self) -> None:
+        """Forget the learned FULL charge voltage (e.g. after an outlier) and relearn it."""
+        state = self.controller.state
+        # A typical 24 V lead-acid absorption level; the first real charge episode
+        # replaces it (full_charge_samples = 0 takes the measured peak directly).
+        state.learned_full_charge_voltage_v = 28.8
+        state.full_charge_samples = 0
+        state.full_charge_peak_v = 0.0
+        state.full_charge_hold_seconds = 0.0
+        state.full_charge_latched = False
+        self.controller.reset_transient()
+        await self.store.async_save(state)
+        await self.async_request_refresh()
+
     async def async_set_battery_chemistry(self, chemistry: str) -> None:
         if chemistry not in ("lead_acid", "lifepo4"):
             return
@@ -426,12 +444,16 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             current = battery_a if battery_a is not None and math.isfinite(battery_a) else 0.0
 
             relaxed_lower_v = None
+            self._last_credit_v = None
+            self._last_relaxed_v = None
             if not invalid_voltage:
                 # Conservative relaxed-voltage estimate from the provisional rebound curve.
                 # NOT a cell-level BMS. The terminal-voltage emergency floor never uses it.
                 sag = predicted_sag(state.rebound_learning_model, max(0.0, inverter_w or 0.0))
                 rebound_credit = max(0.0, sag - 0.20) if sag is not None and current < -0.5 else 0.0
                 relaxed_lower_v = battery_v + rebound_credit
+                self._last_credit_v = round(rebound_credit, 3)
+                self._last_relaxed_v = round(relaxed_lower_v, 3)
 
             verdict = self._guard.evaluate(time.monotonic(), battery_v, relaxed_lower_v, cutoff, emergency_floor)
             if verdict in TRIP_RESULTS and not self._cutoff_latched:
@@ -583,6 +605,9 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         # Monitor/Off is observational only, including release actions.
         if mode not in (MODE_ADAPTIVE, MODE_PREDICTIVE) or not self.controller.enabled:
             return "monitor_no_action"
+        if state.emergency_reserve_enabled:
+            return await self._async_manage_emergency_reserve(entity_id, switch, owned)
+        self._emergency_manual_on = False
         lock_required = self.controller.state.battery_chemistry == "lead_acid" and chemistry_state in ("lead_full_hold", "lead_full_emergency")
         if lock_required:
             now = time.monotonic()
@@ -637,6 +662,55 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         await self.store.async_save(state)
         return "turn_on_sent"
 
+    async def _async_manage_emergency_reserve(self, entity_id: str, switch, owned: bool) -> str:
+        """Notstrom-Vorsorge: the ASC inverter stays off so the battery can be kept full.
+
+        Only the configured switch is touched. A manual switch-on is respected (the
+        emergency may need the inverter) until the switch has been off again.
+        """
+        state = self.controller.state
+        now = time.monotonic()
+        manual_on = bool(getattr(self, "_emergency_manual_on", False))
+        if manual_on:
+            if switch.state == "on":
+                return "emergency_manual_on"
+            self._emergency_manual_on = False  # switched off again: take over again
+        if owned:
+            observed = self._lock_off.observe(switch.state, now)
+            if switch.state == "on":
+                if observed == switch_confirm.IDLE:
+                    self._emergency_manual_on = True  # somebody (you) switched it on on purpose
+                    state.inverter_full_lock_owned = False
+                    state.inverter_full_lock_entity = ""
+                    await self.store.async_save(state)
+                    return "emergency_manual_on"
+                if observed == switch_confirm.PENDING:
+                    return "emergency_turn_off_pending"
+                return await self._async_send_lock_off(entity_id, now)
+            if observed == switch_confirm.CONFIRMED:
+                persistent_notification.async_dismiss(self.hass, "asc_switch_off_unconfirmed")
+                return "emergency_turn_off_confirmed"
+            return "emergency_off"
+        if switch.state == "off":
+            return "emergency_already_off"
+        # Switch is on and not ours: take ownership first (survives a restart), then switch off.
+        state.inverter_full_lock_owned = True
+        state.inverter_full_lock_entity = entity_id
+        await self.store.async_save(state)
+        result = await self._async_send_lock_off(entity_id, now)
+        if result == "turn_off_failed":
+            state.inverter_full_lock_owned = False
+            state.inverter_full_lock_entity = ""
+            await self.store.async_save(state)
+        return result
+
+    async def async_set_emergency_reserve(self, enabled: bool) -> None:
+        state = self.controller.state
+        state.emergency_reserve_enabled = bool(enabled)
+        self._emergency_manual_on = False
+        await self.store.async_save(state)
+        await self.async_request_refresh()
+
     def _measurement_spread_s(self) -> float:
         # v0.4.2.2+: battery-energy integration must never depend on the PV
         # entity timestamp (PV can remain unchanged at 0 W all night). V*A uses
@@ -663,6 +737,30 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             forecast_energy_tomorrow_kwh=self._float_entity(self.cfg.get(CONF_FORECAST_ENERGY_TOMORROW), None),
             measurement_spread_s=self._measurement_spread_s(),
         )
+
+    async def _paused_record(self, reason: str, warmup: bool = False) -> dict:
+        """Paused/warm-up cycles used to leave no recorder row. Write a slim one (max. every 60 s)."""
+        data = self._paused_data(reason, warmup)
+        state = self.controller.state if self.controller else None
+        if state is not None and state.flight_recorder_enabled and time.monotonic() - self._last_pause_record >= 60.0:
+            self._last_pause_record = time.monotonic()
+            critical = self._critical_inputs()
+            switch_entity = self.cfg.get(CONF_INVERTER_POWER_SWITCH) or ""
+            sw = self._state(switch_entity) if switch_entity else None
+            await self.recorder.async_append({
+                "timestamp": datetime.now().astimezone().isoformat(),
+                "events": "PAUSED:" + reason.replace("|", "/"),
+                "blocked_reason": reason,
+                "hard_cutoff_voltage_v": state.hard_cutoff_voltage_v,
+                "hard_cutoff_status": self._last_cutoff_status,
+                "cutoff_credit_v": self._last_credit_v, "cutoff_relaxed_v": self._last_relaxed_v,
+                "emergency_reserve": int(bool(state.emergency_reserve_enabled)),
+                "battery_v": critical.get("battery_voltage"), "battery_a": critical.get("battery_current"),
+                "inverter_output_w": critical.get("inverter_output"),
+                "inverter_power_switch": switch_entity, "inverter_switch_state": sw.state if sw else "not_configured",
+                "inverter_full_lock_owned": state.inverter_full_lock_owned,
+            })
+        return data
 
     def _paused_data(self, reason: str, warmup: bool = False) -> dict:
         c=self.controller; s=c.state if c else None
@@ -710,14 +808,14 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         if not solar_enabled:
             if self._solar_was_enabled: self.controller.reset_transient()
             self._solar_was_enabled=False; self._warmup_pending=True
-            return self._paused_data(release_error or "solar_release_off")
+            return await self._paused_record(release_error or "solar_release_off")
         missing = [k for k, v in critical.items() if v is None]
         if missing:
             self.controller.reset_transient()
-            return self._paused_data("sensor_invalid:" + ",".join(missing))
+            return await self._paused_record("sensor_invalid:" + ",".join(missing))
         if not self._solar_was_enabled or self._warmup_pending:
             self._solar_was_enabled=True; self._warmup_pending=False; self.controller.reset_transient()
-            return self._paused_data("warmup_after_enable", warmup=True)
+            return await self._paused_record("warmup_after_enable", warmup=True)
 
         snap=self._snapshot(); now=datetime.now().astimezone()
         self.controller.battery.absorption_voltage_v = float(self.cfg[CONF_ABSORPTION_V])
@@ -831,7 +929,9 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
                 "capacity_current_kwh":round(new_capacity_kwh,3),
                 "capacity_change_reason":capacity_change_reason,
                 "hard_cutoff_voltage_v":self.controller.state.hard_cutoff_voltage_v,
-                "hard_cutoff_status":cutoff_action, "grid_w":snap.grid_w, "pv_w":snap.pv_w,
+                "hard_cutoff_status":cutoff_action, "cutoff_credit_v":self._last_credit_v, "cutoff_relaxed_v":self._last_relaxed_v,
+                "emergency_reserve":int(bool(self.controller.state.emergency_reserve_enabled)),
+                "grid_w":snap.grid_w, "pv_w":snap.pv_w,
                 "battery_v":snap.battery_v, "battery_a":snap.battery_a, "battery_w":snap.battery_w, "inverter_output_w":snap.inverter_output_w,
                 "target_w":snap.target_w, "recommended_w":result.recommended_w, "applied_w":result.applied_w, "raw_target_w":result.raw_target_w,
                 "effective_limit_w":result.effective_limit_w, "grid_error_w":result.grid_error_w, "predicted_load_w":result.predicted_load_w,

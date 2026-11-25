@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import math
+import time
 
 from .storage import LearningState
 from .rebound_learning import predicted_sag
@@ -59,12 +60,15 @@ class BatteryEstimator:
     RELAXED_CURRENT_A = 0.8
     RELAXED_CONFIRM_S = 600.0
     LOW_ANCHOR_MARGIN_V = 0.25
+    FULL_PEAK_STEP_V = 0.3
+    FULL_CYCLE_MAX_AGE_S = 5 * 24 * 3600.0  # FULL anchor older than this no longer defines a cycle
     LOW_ANCHOR_CONFIRM_S = 90.0
     LOW_ANCHOR_RELEASE_MARGIN_V = 0.55
     LOW_ANCHOR_RELEASE_CONFIRM_S = 180.0
 
     def __init__(self, state: LearningState) -> None:
         self.state = state
+        self._peak_ceiling_v: float | None = None
         self.absorption_voltage_v = 29.4
         self.absorption_tolerance_v = 0.4
         self.absorption_minutes = 120.0
@@ -244,8 +248,13 @@ class BatteryEstimator:
         # Capacity learning must keep counting physical discharge even if the
         # provisional stored-energy estimate already hit zero. This is how an
         # underestimated start capacity can learn upward.
-        if delta < 0.0 and self.state.full_cycle_active:
-            self.state.discharge_since_full_kwh += -delta
+        if self.state.full_cycle_active:
+            if delta < 0.0:
+                self.state.discharge_since_full_kwh += -delta
+            elif delta > 0.0:
+                # v0.4.8: charging inside an open FULL cycle (e.g. a short PV
+                # window) reduces the net discharge instead of closing the cycle.
+                self.state.discharge_since_full_kwh = max(0.0, self.state.discharge_since_full_kwh - delta)
         return actual_delta
 
     def _learn_low_anchor(self, dt: float, battery_v: float, battery_a: float, inverter_output_w: float, hard_low_v: float, quality_ok: bool, events: list[str]) -> bool:
@@ -277,7 +286,8 @@ class BatteryEstimator:
 
         # Only a confirmed FULL->LOW cycle may establish an energy anchor.
         # The terminal voltage under load alone is not a capacity measurement.
-        if not self.state.full_cycle_active or self.state.last_full_anchor_ts is None:
+        if (not self.state.full_cycle_active or self.state.last_full_anchor_ts is None
+                or time.time() - self.state.last_full_anchor_ts > self.FULL_CYCLE_MAX_AGE_S):
             self.state.low_anchor_hold_seconds = 0.0
             events.append("LOW_ANCHOR_REJECTED_NO_FULL")
             return False
@@ -374,8 +384,8 @@ class BatteryEstimator:
             self.state.usable_capacity_estimate_kwh = min(60.0, old + 0.05 * (sample - old))
             self.state.last_capacity_sample_kwh = sample
             events.append("PARTIAL_CAPACITY_LOWER_BOUND")
-        self.state.full_cycle_active = False
-        self.state.discharge_since_full_kwh = 0.0
+        # v0.4.8: the FULL cycle stays open (net discharge accounting above).
+        # It ends with the next FULL, a confirmed low anchor or when it is stale.
 
     def _start_gap(self) -> None:
         self.state.current_gap_duration_s = 0.0
@@ -476,12 +486,22 @@ class BatteryEstimator:
         strong_charge = battery_a >= 0.5  # FULL is chemistry/terminal-state based; charging source may be PV or external
         threshold = max(hard_low_v + 2.0, self.state.learned_full_charge_voltage_v - 0.8)
         if strong_charge and battery_v >= threshold:
+            if self.state.full_charge_hold_seconds <= 0.0 or self._peak_ceiling_v is None:
+                if self.state.full_charge_hold_seconds <= 0.0:
+                    self.state.full_charge_peak_v = 0.0  # a new charge episode starts with a fresh peak
+                # v0.4.8: the ceiling is fixed per charge episode, so the peak may
+                # never exceed the learned value (at episode start) by more than
+                # 0.3 V and a single outlier cannot ratchet the learned FULL voltage up.
+                self._peak_ceiling_v = (
+                    float("inf") if self.state.full_charge_samples == 0
+                    else self.state.learned_full_charge_voltage_v + self.FULL_PEAK_STEP_V
+                )
             self.state.full_charge_hold_seconds += dt
-            self.state.full_charge_peak_v = max(self.state.full_charge_peak_v, battery_v)
+            self.state.full_charge_peak_v = max(self.state.full_charge_peak_v, min(battery_v, self._peak_ceiling_v))
         else:
             self.state.full_charge_hold_seconds = max(0.0, self.state.full_charge_hold_seconds - dt * 0.5)
         if strong_charge and self.state.full_charge_hold_seconds >= 900.0:
-            candidate = max(battery_v, self.state.full_charge_peak_v)
+            candidate = self.state.full_charge_peak_v if self.state.full_charge_peak_v > 0.0 else battery_v
             alpha = 0.32 if self.state.full_charge_samples < 3 else 0.12
             old = self.state.learned_full_charge_voltage_v
             learned = candidate if self.state.full_charge_samples == 0 or old <= hard_low_v + 1.0 else old + alpha * (candidate - old)
@@ -494,6 +514,8 @@ class BatteryEstimator:
                 self.state.full_charge_latched = True
         elif not strong_charge and self.state.full_charge_hold_seconds <= 30.0:
             self.state.full_charge_latched = False
+            self.state.full_charge_peak_v = 0.0  # charge episode over: forget its peak
+            self._peak_ceiling_v = None
 
     def _learn_transition(self, dt: float, battery_v: float, battery_a: float, pv_w: float, hard_low_v: float, calibration_enabled: bool, events: list[str]) -> bool:
         if not self.state.full_seen_pending: return False
