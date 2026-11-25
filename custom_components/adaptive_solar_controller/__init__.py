@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import CONF_DAILY_PRODUCTION_SENSOR, DOMAIN, PLATFORMS
 from .coordinator import AdaptiveSolarCoordinator
+from .panel_config import panel_entities
 from .recorder_files import FOLDER as RECORDER_FOLDER, list_files, resolve
 
 STATIC_URL = "/asc_static"
@@ -52,6 +53,20 @@ async def async_pv_csv(hass, connection, msg):
         connection.send_result(msg["id"], result)
     except (ValueError, TypeError) as exc:
         connection.send_error(msg["id"], "invalid_csv", str(exc))
+
+
+@websocket_api.websocket_command({vol.Required("type"): "adaptive_solar_controller/panel_config",
+    vol.Optional("entry_id"): str})
+@websocket_api.async_response
+async def async_panel_config(hass, connection, msg):
+    """entry_id and the configured sensors, so the panel needs no hard-coded entity ids."""
+    runners = {k: v for k, v in hass.data.get(DOMAIN, {}).items() if hasattr(v, "cfg")}
+    entry_id = msg.get("entry_id") or (next(iter(runners)) if runners else None)
+    coordinator = runners.get(entry_id)
+    if coordinator is None:
+        connection.send_error(msg["id"], "not_found", "ASC config entry not running")
+        return
+    connection.send_result(msg["id"], {"entry_id": entry_id, "entities": panel_entities(coordinator.cfg)})
 
 
 @websocket_api.websocket_command({vol.Required("type"): "adaptive_solar_controller/recorder_list"})
@@ -110,6 +125,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not domain_data.get("_pv_ws_registered"):
         websocket_api.async_register_command(hass, async_pv_csv)
         websocket_api.async_register_command(hass, async_recorder_list)
+        websocket_api.async_register_command(hass, async_panel_config)
         hass.http.register_view(RecorderDownloadView())
         domain_data["_pv_ws_registered"] = True
     coordinator = AdaptiveSolarCoordinator(hass, entry)

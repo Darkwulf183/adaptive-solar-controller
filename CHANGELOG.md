@@ -15,6 +15,13 @@ Nur im Zweig `dev` und als ZIP; `.storage` vor dem Test sichern.
 - Statuswerte im Recorder (`inverter_switch_action`): `emergency_off`, `emergency_turn_off_confirmed`, `emergency_turn_off_pending`,
   `emergency_already_off`, `emergency_manual_on`. Neue Recorder-Spalte `emergency_reserve`.
 
+### Panel und Aufräumen
+- Panel liest Netz-/Ziel-/Batterie-/PV-Entitäten aus der Konfiguration (keine festen IDs mehr).
+- Notstrom-Schalter in Steuerung und Kopfzeile, Reset-Knopf für den FULL-Wert (zweistufig), Status der Wechselrichter-Sperre im Reiter Sicherheit
+  (neuer Sensor *Inverter switch status*), deutsche Texte für alle Sperr-Status.
+- Versionsnummer kommt überall aus `manifest.json` (neuer Diagnose-Sensor *ASC version*); Dashboard-Beispiel ohne Versionsnummern im Titel.
+- Recorder-Dateien lassen sich im Panel herunterladen. Sensornamen vereinheitlicht (nur Namen, Entity-IDs unverändert).
+
 ### Lernen
 - **FULL-Spitzenwert:** `full_charge_peak_v` gilt nur noch für die laufende Ladephase und darf den gelernten Wert höchstens um 0,3 V überschreiten.
   Ein einmaliger Ausreißer zieht den gelernten FULL-Wert nicht mehr bei jeder Ladung wieder hoch (dadurch wurde FULL im November nicht mehr erkannt).

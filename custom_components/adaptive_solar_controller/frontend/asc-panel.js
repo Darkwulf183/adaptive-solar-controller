@@ -1,6 +1,6 @@
 /* Adaptive Solar Controller – Sidebar-Panel (Design 2; Version kommt aus sensor.adaptive_solar_controller_asc_version)
  * Tabs: Übersicht · Planer & Prognose · Batterie & Lernen · Sicherheit · Steuerung
- * Alle Entity-IDs, Services und der CSV-Import sind unverändert zur Vorversion.
+ * Sensoren aus der Konfiguration kommen per Websocket (adaptive_solar_controller/panel_config), keine festen Nutzer-IDs.
  */
 
 // Deutsche Anzeigetexte für technische Zustandswerte. Unbekannte Werte werden
@@ -32,6 +32,15 @@ const T = {
   cutoff_latched: "Abschaltung verriegelt", cutoff_switch_off_sent: "Abschaltung ausgelöst",
   cutoff_switch_error: "Abschaltung fehlgeschlagen", cutoff_no_dedicated_switch: "Kein Power-Schalter konfiguriert",
   cutoff_controller_disabled: "Verriegelt (Regler aus)",
+  locked_off: "Wechselrichter aus (Sperre)", turn_off_sent: "Abschaltbefehl gesendet", turn_off_pending: "Abschaltung wird bestätigt",
+  turn_off_confirmed: "Abschaltung bestätigt", turn_off_retry: "Abschaltung wird wiederholt", turn_off_unconfirmed: "Abschaltung nicht bestätigt",
+  turn_off_failed: "Abschaltbefehl fehlgeschlagen", turn_on_sent: "Wechselrichter freigegeben", turn_on_failed: "Freigabe fehlgeschlagen",
+  manual_override_on: "Von Hand eingeschaltet", no_lock: "Keine Sperre", already_off_not_owned: "Aus (von Hand)", already_on_release: "Sperre aufgehoben",
+  awaiting_confirmed_full: "Wartet auf bestätigte Vollladung", switch_unavailable: "Schalter nicht verfügbar", monitor_no_action: "Monitor (keine Aktion)",
+  not_configured: "Nicht konfiguriert", invalid_same_as_solar_enable: "Ungültig: Schalter = Solar-Freigabe", cutoff_priority: "Notabschaltung hat Vorrang", owner_switch_adopted: "Schalter übernommen", stale_owner_released: "Alte Sperre verworfen",
+  owner_switch_pending: "Schalter wird geprüft", config_changed_manual_recovery: "Konfiguration geändert",
+  emergency_off: "Notstrom: Wechselrichter aus", emergency_turn_off_confirmed: "Notstrom: Abschaltung bestätigt", emergency_turn_off_pending: "Notstrom: Abschaltung läuft",
+  emergency_already_off: "Notstrom: bereits aus", emergency_manual_on: "Notstrom: von Hand eingeschaltet",
   recovered_manual_reenable_if_needed: "Erholt – Wechselrichter ggf. manuell einschalten",
 };
 const SENSOR_NAMES = { battery_voltage: "Batteriespannung", battery_current: "Batteriestrom", grid: "Netzleistung", inverter_output: "Inverter-Ausgang" };
@@ -45,10 +54,10 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
   }
 
   /* ---------- Entities ---------- */
-  get cfg() { return {
+  get cfg() { const E = this._pc?.entities || {}; return {
     mode:"select.adaptive_solar_controller_control_mode",chem:"select.adaptive_solar_controller_battery_chemistry",
     enabled:"switch.adaptive_solar_controller_controller_enabled",recorder:"switch.adaptive_solar_controller_14_day_flight_recorder",calibration:"switch.adaptive_solar_controller_battery_calibration",
-    state:"sensor.adaptive_solar_controller_controller_state",reason:"sensor.adaptive_solar_controller_blocked_reason",grid:"sensor.e320_power_in",target:"input_number.inverter_target_power",
+    state:"sensor.adaptive_solar_controller_controller_state",reason:"sensor.adaptive_solar_controller_blocked_reason",grid:E.grid,target:E.target,
     recommended:"sensor.adaptive_solar_controller_recommended_target",applied:"sensor.adaptive_solar_controller_applied_target",limit:"sensor.adaptive_solar_controller_effective_inverter_limit",
     stored:"sensor.adaptive_solar_controller_estimated_stored_battery_energy",capacity:"sensor.adaptive_solar_controller_learned_usable_battery_capacity",capacityConf:"sensor.adaptive_solar_controller_battery_capacity_confidence",
     reserve:"sensor.adaptive_solar_controller_estimated_battery_reserve",targetReserve:"sensor.adaptive_solar_controller_target_reserve_at_next_pv_charge",energyConf:"sensor.adaptive_solar_controller_battery_energy_state_confidence",
@@ -70,7 +79,8 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
     inverterMax:"number.adaptive_solar_controller_inverter_max_power",lowMode:"select.adaptive_solar_controller_low_recovery_calibration_mode",
     lowStatus:"sensor.adaptive_solar_controller_low_recovery_status",lowStep:"sensor.adaptive_solar_controller_low_recovery_step",lowRuns:"sensor.adaptive_solar_controller_low_recovery_successful_runs",
     historyDays:"sensor.adaptive_solar_controller_seasonal_history_days",
-    battery:"sensor.solar_average_voltage",current:"sensor.solar_complete_ampere",pv:"sensor.solar_watt_aktuell",events:"sensor.adaptive_solar_controller_asc_event_marker",flight:"sensor.adaptive_solar_controller_flight_recorder_file",
+    battery:E.battery,current:E.current,pv:E.pv,events:"sensor.adaptive_solar_controller_asc_event_marker",flight:"sensor.adaptive_solar_controller_flight_recorder_file",
+    switchStatus:"sensor.adaptive_solar_controller_inverter_switch_status",emergency:"switch.adaptive_solar_controller_emergency_power_reserve",resetFull:"button.adaptive_solar_controller_reset_learned_full_charge_voltage",fullVoltage:"sensor.adaptive_solar_controller_learned_full_charge_voltage",
     load:"sensor.adaptive_solar_controller_estimated_house_load",predLoad:"sensor.adaptive_solar_controller_predicted_load"
   }; }
   get ids() { return this._ids || (this._ids = Object.values(this.cfg)); }
@@ -83,6 +93,7 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
       this._root.addEventListener("click", (e) => this._onClick(e));
       this._root.addEventListener("change", (e) => this._onChange(e));
     }
+    if (!this._pcTried && !(this._pcRetryAt > Date.now())) { this._pcTried = true; this._loadPanelConfig(); }
     if (Date.now() - this._histAt > 300000) this._loadHist();
     const sig = this._tab + "\u0002" + this._histAt + "\u0002" +
       this.ids.map((id) => { const e = h.states[id]; return e ? e.state + "|" + (e.attributes?.unit_of_measurement || "") : "-"; }).join("\u0001");
@@ -91,12 +102,22 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
   }
   set panel(p) { this._panel = p; if (this._hass) this.render(); }
 
+  /* ---------- Konfigurierte Sensoren (statt fest eingetragener Entity-IDs) ---------- */
+  async _loadPanelConfig() {
+    try {
+      const entry_id = this._panel?.config?.entry_id || this._panel?.config?.entryId;
+      this._pc = await this._hass.callWS(entry_id ? { type: "adaptive_solar_controller/panel_config", entry_id } : { type: "adaptive_solar_controller/panel_config" });
+      this._ids = null; this._sig = null; this._histAt = 0; this.render();
+    } catch (e) { this._pcTried = false; this._pcRetryAt = Date.now() + 30000; }
+  }
+
   /* ---------- 24 h history for the trend charts ---------- */
   async _loadHist() {
     if (this._histBusy || !this._hass) return;
     this._histBusy = true;
     try {
-      const c = this.cfg, ids = [c.battery, c.current, c.grid, c.applied, c.pv];
+      const c = this.cfg, ids = [c.battery, c.current, c.grid, c.applied, c.pv].filter(Boolean);
+      if (!ids.length) return;
       const end = new Date(), start = new Date(end.getTime() - 24 * 3600 * 1000);
       const r = await this._hass.callWS({
         type: "history/history_during_period", start_time: start.toISOString(), end_time: end.toISOString(),
@@ -338,7 +359,7 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
     const status = this.card("Batterieschutz", `
       <div class="state ${okish ? "ok" : cs.startsWith("cutoff") ? "bad" : "warn"}"><b>${okish ? "Alles in Ordnung" : this.esc(this.lab(c.cutoffStatus))}</b><span>${okish ? "Keine Unterspannung, keine Verriegelung." : "Siehe Details unten."}</span></div>
       ${ladder}
-      ${this.rowT("Abschaltstatus / Verriegelung", c.cutoffStatus)}${this.row("Gemessene Batteriespannung", c.battery, 2, "V")}${this.rowT("Messqualität", c.measureQuality)}`, { icon: "🛡️", cls: "wide" });
+      ${this.rowT("Abschaltstatus / Verriegelung", c.cutoffStatus)}${this.rowT("Wechselrichter-Schalter (Sperre)", c.switchStatus)}${this.row("Gemessene Batteriespannung", c.battery, 2, "V")}${this.rowT("Messqualität", c.measureQuality)}`, { icon: "🛡️", cls: "wide" });
     const limits = this.card("Grenzwerte", `
       ${this.row("LOW-Abschaltgrenze (erholt) – Einstellung", c.cutoffSetting, 1, "V")}${this.row("Tatsächlich konfigurierte LOW-Grenze", c.cutoffActual, 1, "V")}${this.row("Notabschaltung (Klemmenspannung)", c.emergencySetting, 1, "V")}
       <p class="hint">Einstellwerte anklicken, um sie zu ändern.</p>`, { icon: "📏" });
@@ -351,13 +372,14 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
   }
 
   tabControl() {
-    const c = this.cfg, mode = String(this.raw(c.mode)), chem = String(this.raw(c.chem)), rec = this.raw(c.recorder) === "on", cal = this.raw(c.calibration) === "on";
+    const c = this.cfg, mode = String(this.raw(c.mode)), chem = String(this.raw(c.chem)), rec = this.raw(c.recorder) === "on", cal = this.raw(c.calibration) === "on", emg = this.raw(c.emergency) === "on";
     const ctrl = this.card("Regelung", `
       <div class="lbl">Modus</div>${this.seg([["off", "Aus"], ["monitor", "Monitor"], ["adaptive", "Adaptiv"], ["predictive", "Prädiktiv"]], mode, "data-m")}
       <div class="lbl">Batteriechemie</div>${this.seg([["lead_acid", "Blei-Säure"], ["lifepo4", "LiFePO₄"]], chem, "data-c")}
       <div class="sep"></div>
       ${this.tog("Flight Recorder", "Protokolliert jeden Zyklus als CSV", c.recorder, rec)}
-      ${this.tog("Batterie-Kalibrierung", cal ? "Läuft – Regelung ist eingeschränkt" : "Aus", c.calibration, cal, true)}`, { icon: "🎛️", cls: cal ? "warncard" : "" });
+      ${this.tog("Batterie-Kalibrierung", cal ? "Läuft – Regelung ist eingeschränkt" : "Aus", c.calibration, cal, true)}
+      ${this.tog("Notstrom-Vorsorge", emg ? "Wechselrichter bleibt aus, Akku wird per PV voll gehalten" : "Aus – z. B. vor Sturm oder erwartetem Stromausfall einschalten", c.emergency, emg, true)}`, { icon: "🎛️", cls: cal ? "warncard" : "" });
     const fast = this.card("Fast Grid Controller", `
       ${this.row("Netz", c.grid, 0, "W")}${this.row("Zielwert (Helper)", c.target, 0, "W")}${this.row("Empfehlung", c.recommended, 0, "W")}${this.row("Angewendet", c.applied, 0, "W")}${this.row("PV aktuell", c.pv, 0, "W")}
       <div class="sep"></div>${this.rowT("Status", c.state, { ok: "Regelung läuft" })}${this.rowT("Blockiergrund", c.reason)}`, { icon: "⚡" });
@@ -367,14 +389,19 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
       <label class="drop"><span id="pv-csv-selected">${this._selectedCsvFile ? "Ausgewählt: " + this.esc(this._selectedCsvFile.name) : "CSV-Datei wählen …"}</span><span id="pv-csv-slot"></span></label>
       <label class="chk"><input type="checkbox" id="pv-csv-replace" ${this._csvReplace ? "checked" : ""}> Vorhandene Tage ersetzen (sonst bleiben sie unverändert)</label>
       <div class="btns"><button id="pv-csv-preview">CSV prüfen</button><button id="pv-csv-commit" class="primary">Import bestätigen</button></div>
-      <p id="pv-csv-status" class="hint">${this.esc(this._csvStatus || "Bis zu 3 MB / 1100 Tage. Panel-Konfiguration benötigt entry_id.")}</p>`, { icon: "📁", cls: "wide" });
+      <p id="pv-csv-status" class="hint">${this.esc(this._csvStatus || "Bis zu 3 MB / 1100 Tage.")}</p>`, { icon: "📁", cls: "wide" });
     const files = this._recFiles;
+    const armed = !!this._resetArmed;
+    const fullCard = this.card("Gelernte FULL-Spannung", `
+      ${this.row("Gelernter Wert", c.fullVoltage, 2, "V")}${this.row("Tage seit Vollladung", c.daysFull, 1, "")}
+      <p class="hint top">Zurücksetzen, wenn ein einmaliger Ausreißer den Wert verfälscht hat. ASC lernt ihn dann bei der nächsten Ladung neu (Startwert 28,8 V).</p>
+      <div class="btns"><button id="full-reset" class="${armed ? "primary" : ""}">${armed ? "Wirklich zurücksetzen?" : "Zurücksetzen …"}</button></div>`, { icon: "🔄" });
     const recCard = this.card("Flight Recorder · Download", `
       <p class="hint top">Die täglichen CSV-Dateien herunterladen (nur Administratoren). Neueste zuerst.</p>
       <div class="btns"><button id="rec-refresh">Liste laden</button></div>
       ${files && files.length ? files.slice(0, 20).map((f) => `<div class="row"><span>${this.esc(f.name.replace(/^ASC_v[^_]+_FlightRecorder_/, "").replace(/\.csv$/, ""))} · ${(f.size / 1048576).toFixed(1)} MB</span><b><button data-rec="${this.esc(f.name)}">Herunterladen</button></b></div>`).join("") : ""}
       <p id="rec-status" class="hint">${this.esc(this._recStatus || (files ? (files.length ? "" : "Keine Dateien gefunden.") : "Mit „Liste laden“ die vorhandenen Dateien anzeigen."))}</p>`, { icon: "✈️", cls: "wide" });
-    return `<div class="cols">${ctrl}${fast}${diag}${recCard}${csv}</div>`;
+    return `<div class="cols">${ctrl}${fast}${diag}${fullCard}${recCard}${csv}</div>`;
   }
 
   /* ---------- Render ---------- */
@@ -388,13 +415,14 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
       <header class="hero">
         <img class="logo" src="/asc_static/asc-icon.png" alt="">
         <div class="ht"><h1>Adaptive Solar Controller</h1><div class="sub">${this.esc(this.ver())} · Estimator → Strategy Learner → Energy Planner → Fast Controller</div></div>
-        <button class="back" type="button">← Solar</button>
+        <button class="back" type="button">← Zurück</button>
       </header>
       <div class="pills">
         <span class="pill ${this.raw(c.state) === "ok" ? "ok" : "mute"}" title="${this.st(c.state)}"><i></i>${this.esc(this.lab(c.state, { ok: "Regelung läuft" }))}</span>
         <span class="pill acc">Modus <b>${this.esc(this.lab(c.mode))}</b></span>
         <span class="pill acc">${this.esc(this.lab(c.chem))}</span>
         <span class="pill ${alarm ? "bad" : pend ? "warn" : "ok"}">🛡️ ${alarm || pend ? this.esc(this.lab(c.cutoffStatus)) : "Schutz bereit"}</span>
+        ${this.raw(c.emergency) === "on" ? `<span class="pill warn">🔋 Notstrom-Vorsorge aktiv</span>` : ""}
         <span class="pill mute">Letzte Vollladung vor <b>${this.val(c.daysFull, 1, "")}</b> Tagen</span>
       </div>
       <p class="now">${this.narrative()}</p>
@@ -464,15 +492,16 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
   }
 
   _onClick(e) {
-    const t = e.target.closest("[data-e],[data-m],[data-c],[data-t],[data-tab],[data-rec],.back,#pv-csv-preview,#pv-csv-commit,#rec-refresh");
+    const t = e.target.closest("[data-e],[data-m],[data-c],[data-t],[data-tab],[data-rec],.back,#pv-csv-preview,#pv-csv-commit,#rec-refresh,#full-reset");
     if (!t) return;
     if (t.dataset.tab) { this._tab = t.dataset.tab; this._tabChanged = true; this._sig = null; this.render(); }
     else if (t.dataset.m) this.mode(t.dataset.m);
     else if (t.dataset.c) this.chem(t.dataset.c);
     else if (t.dataset.t) this.toggle(t.dataset.t);
-    else if (t.classList.contains("back")) window.location.href = "/dashboard-solar/solar";
+    else if (t.classList.contains("back")) { if (window.history.length > 1) window.history.back(); else window.location.href = "/"; }
     else if (t.dataset.rec) this.recDownload(t.dataset.rec);
     else if (t.id === "rec-refresh") this.recList();
+    else if (t.id === "full-reset") this.resetFull();
     else if (t.id === "pv-csv-preview") this.csvImport(false);
     else if (t.id === "pv-csv-commit") this.csvImport(true);
     else if (t.dataset.e) this.info(t.dataset.e);
@@ -482,6 +511,18 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
   ver() {
     const v = this._hass?.states?.["sensor.adaptive_solar_controller_asc_version"]?.state;
     return v && v !== "unknown" && v !== "unavailable" ? "v" + v : "v?";
+  }
+
+  async resetFull() {
+    // Zweistufig: erster Klick scharf schalten, zweiter Klick (innerhalb von 8 s) löst aus.
+    if (!this._resetArmed) {
+      this._resetArmed = true; clearTimeout(this._resetTimer);
+      this._resetTimer = setTimeout(() => { this._resetArmed = false; this._sig = null; this.render(); }, 8000);
+    } else {
+      this._resetArmed = false; clearTimeout(this._resetTimer);
+      await this._hass.callService("button", "press", { entity_id: this.cfg.resetFull });
+    }
+    this._sig = null; this.render();
   }
 
   async recList() {
@@ -517,8 +558,8 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
     try {
       setS("CSV wird geprüft …");
       const csv = await file.text();
-      const entry_id = this._panel?.config?.entry_id || this._panel?.config?.entryId || "";
-      if (!entry_id) { setS("ASC entry_id fehlt in der Panel-Konfiguration. Bitte in panel_custom setzen."); return; }
+      const entry_id = this._panel?.config?.entry_id || this._panel?.config?.entryId || this._pc?.entry_id || "";
+      if (!entry_id) { setS("ASC-Konfiguration nicht geladen. Bitte Seite neu laden."); return; }
       const result = await this._hass.callWS({ type: "adaptive_solar_controller/pv_csv", entry_id, csv, commit, replace });
       this._csvResult = result;
       setS(`${commit ? "Import gespeichert" : "Vorschau"}: ${result.parsed_days} CSV-Tage, ${result.added_days} neu, ${result.replaced_days || 0} ersetzt, ${result.duplicates} unverändert, ${result.days} insgesamt; Kalenderjahre komplett: ${(result.full_calendar_years || []).join(", ") || "keines"}; theoretischer Einfluss ${(result.theoretical_weight * 100).toFixed(1)} %, aktiv 0 %.`);

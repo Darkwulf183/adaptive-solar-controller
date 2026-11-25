@@ -795,7 +795,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             "battery_energy_charged_total_kwh":s.battery_energy_charged_total_kwh if s else 0.0,
             "battery_energy_discharged_total_kwh":s.battery_energy_discharged_total_kwh if s else 0.0,
             "hard_cutoff_voltage_v":s.hard_cutoff_voltage_v if s else 22.8,
-            "hard_cutoff_status":self._last_cutoff_status, "flight_recorder_path":str(self.recorder.path), "version":VERSION, "events":"",
+            "hard_cutoff_status":self._last_cutoff_status, "flight_recorder_path":str(self.recorder.path), "version":VERSION, "inverter_switch_action":None, "events":"",
         }
 
     async def _async_update_data(self) -> dict:
@@ -918,7 +918,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             "battery_energy_discharged_total_kwh":self.controller.state.battery_energy_discharged_total_kwh,
             "actual_pv_today_kwh":snap.daily_production_kwh,
             "corrected_forecast_today_total_kwh":None if snap.daily_production_kwh is None or result.corrected_forecast_remaining_kwh is None else round(snap.daily_production_kwh + result.corrected_forecast_remaining_kwh,3),
-            "flight_recorder_path":str(self.recorder.path), "version":VERSION, "events":",".join(result.events),
+            "flight_recorder_path":str(self.recorder.path), "version":VERSION, "inverter_switch_action":switch_action, "events":",".join(result.events),
         }
 
         if self.controller.state.flight_recorder_enabled:

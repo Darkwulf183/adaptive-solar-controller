@@ -94,8 +94,8 @@ SENSORS = [
     ASCSensorDescription(key="planner_reason", name="Energy planner reason", icon="mdi:clipboard-text-clock-outline", data_key="planner_reason"),
 
     # Persistent Home Assistant Energy Dashboard battery counters
-    ASCSensorDescription(key="battery_energy_charged_total", name="Battery Energy Charged Total", native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR, device_class=SensorDeviceClass.ENERGY, state_class=SensorStateClass.TOTAL_INCREASING, icon="mdi:battery-plus", data_key="battery_energy_charged_total_kwh"),
-    ASCSensorDescription(key="battery_energy_discharged_total", name="Battery Energy Discharged Total", native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR, device_class=SensorDeviceClass.ENERGY, state_class=SensorStateClass.TOTAL_INCREASING, icon="mdi:battery-minus", data_key="battery_energy_discharged_total_kwh"),
+    ASCSensorDescription(key="battery_energy_charged_total", name="Battery energy charged total", native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR, device_class=SensorDeviceClass.ENERGY, state_class=SensorStateClass.TOTAL_INCREASING, icon="mdi:battery-plus", data_key="battery_energy_charged_total_kwh"),
+    ASCSensorDescription(key="battery_energy_discharged_total", name="Battery energy discharged total", native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR, device_class=SensorDeviceClass.ENERGY, state_class=SensorStateClass.TOTAL_INCREASING, icon="mdi:battery-minus", data_key="battery_energy_discharged_total_kwh"),
 
     # ASC v0.4.2 integrated battery energy / universal energy release
     ASCSensorDescription(key="stored_energy", name="Estimated stored battery energy", native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR, icon="mdi:battery", data_key="stored_energy_kwh"),
@@ -131,6 +131,7 @@ SENSORS = [
 
     # Diagnostics
     ASCSensorDescription(key="flight_recorder_path", name="Flight recorder file", icon="mdi:file-delimited-outline", data_key="flight_recorder_path"),
+    ASCSensorDescription(key="inverter_switch_status", name="Inverter switch status", icon="mdi:power-plug-outline", data_key="inverter_switch_action"),
     ASCSensorDescription(key="version", name="ASC version", icon="mdi:tag-outline", entity_category=EntityCategory.DIAGNOSTIC, data_key="version"),
     ASCSensorDescription(key="events", name="ASC event marker", icon="mdi:flag-outline", data_key="events"),
     ASCSensorDescription(key="controller_state", name="Controller state", icon="mdi:information-outline", data_key="status"),
