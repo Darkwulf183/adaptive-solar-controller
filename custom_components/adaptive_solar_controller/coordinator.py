@@ -460,6 +460,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
                 _LOGGER.warning("ASC battery cutoff latched (%s): V=%s", verdict, battery_v)
                 self._cutoff_latched = True
                 state.hard_cutoff_latched = True
+                state.cutoff_full_required_ts = time.time()
                 await self.store.async_save(state)
 
             if not self._cutoff_latched:
@@ -472,6 +473,16 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
                 if self._cutoff_notified:
                     persistent_notification.async_dismiss(self.hass, "asc_cutoff_no_switch")
                     self._cutoff_notified = False
+                # v0.4.8: the inverter we switched off stays off until a NEW confirmed FULL anchor.
+                # ASC takes ownership of the (off) switch so the normal FULL release can switch it on.
+                adopt_id = self.cfg.get(CONF_INVERTER_POWER_SWITCH) or ""
+                sw_state = self._state(adopt_id) if adopt_id and adopt_id != self.cfg.get(CONF_SOLAR_ENABLE) else None
+                if sw_state is not None and sw_state.state == "off" and state.cutoff_full_required_ts:
+                    state.inverter_full_lock_owned = True
+                    state.inverter_full_lock_entity = adopt_id
+                    await self.store.async_save(state)
+                    return "recovered_wait_for_full"
+                state.cutoff_full_required_ts = None
                 await self.store.async_save(state)
                 return "recovered_manual_reenable_if_needed"
 
@@ -618,6 +629,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
                         # No open switch-off command of ours: someone switched it on manually.
                         state.inverter_full_lock_owned = False
                         state.inverter_full_lock_entity = ""
+                        state.cutoff_full_required_ts = None
                         await self.store.async_save(state)
                         return "manual_override_on"
                     if observed == switch_confirm.PENDING:
@@ -644,6 +656,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         if switch.state == "on":
             state.inverter_full_lock_owned = False
             state.inverter_full_lock_entity = ""
+            state.cutoff_full_required_ts = None
             await self.store.async_save(state)
             return "already_on_release"
         # Release ONLY on the confirmed post-FULL state; never on a plan/forecast change.
@@ -652,6 +665,9 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         full_ts = state.last_full_anchor_ts
         if not full_ts or time.time() - float(full_ts) < 3600:
             return "awaiting_confirmed_full"
+        # After a battery cutoff only a FULL anchor NEWER than the cutoff may release the switch.
+        if state.cutoff_full_required_ts and float(full_ts) <= float(state.cutoff_full_required_ts):
+            return "awaiting_full_after_cutoff"
         try:
             await self.hass.services.async_call("switch", "turn_on", {"entity_id": entity_id}, blocking=True)
         except Exception:
@@ -659,6 +675,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             return "turn_on_failed"
         state.inverter_full_lock_owned = False
         state.inverter_full_lock_entity = ""
+        state.cutoff_full_required_ts = None
         await self.store.async_save(state)
         return "turn_on_sent"
 

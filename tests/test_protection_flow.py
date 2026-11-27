@@ -269,6 +269,78 @@ class LockFlow(unittest.TestCase):
         self.assertEqual(c.hass.calls, [])
 
 
+class CutoffRecoveryFlow(unittest.TestCase):
+    """After a battery cutoff the inverter only returns with a FULL anchor newer than the cutoff."""
+    def setUp(self):
+        self.clock = Clock()
+        self._orig = coord_mod.time.monotonic
+        coord_mod.time.monotonic = self.clock
+        NOTES.created.clear(); NOTES.dismissed.clear()
+
+    def tearDown(self): coord_mod.time.monotonic = self._orig
+
+    def tripped(self):
+        c = make()
+        for _ in range(5):
+            run(c._async_manage_cutoff(22.5, -5.0, 300.0)); self.clock.advance(10)
+        self.assertTrue(c._cutoff_latched)
+        self.assertEqual(c.hass.get(SWITCH).state, "off")
+        self.assertIsNotNone(c.controller.state.cutoff_full_required_ts)
+        return c
+
+    def recover(self, c):
+        return run(c._async_manage_cutoff(24.0, 3.0, 0.0))
+
+    def test_recovery_keeps_inverter_off_and_takes_ownership(self):
+        c = self.tripped()
+        self.assertEqual(self.recover(c), "recovered_wait_for_full")
+        st = c.controller.state
+        self.assertTrue(st.inverter_full_lock_owned)
+        self.assertEqual(st.inverter_full_lock_entity, SWITCH)
+
+    def test_old_full_anchor_does_not_release(self):
+        c = self.tripped(); self.recover(c)
+        st = c.controller.state
+        st.last_full_anchor_ts = st.cutoff_full_required_ts - 3 * 24 * 3600
+        calls = len(c.hass.calls)
+        r = run(c._async_manage_full_lock("lead_post_full", "adaptive"))
+        self.assertEqual(r, "awaiting_full_after_cutoff")
+        self.assertEqual(len(c.hass.calls), calls)
+
+    def test_new_full_anchor_switches_on(self):
+        c = self.tripped(); self.recover(c)
+        st = c.controller.state
+        st.last_full_anchor_ts = st.cutoff_full_required_ts + 2 * 3600 - 7200 - 4000
+        st.last_full_anchor_ts = coord_mod.time.time() - 4000
+        st.cutoff_full_required_ts = coord_mod.time.time() - 20000
+        r = run(c._async_manage_full_lock("lead_post_full", "adaptive"))
+        self.assertEqual(r, "turn_on_sent")
+        self.assertIn(("switch", "turn_on", SWITCH), c.hass.calls)
+        self.assertIsNone(st.cutoff_full_required_ts)
+        self.assertFalse(st.inverter_full_lock_owned)
+
+    def test_new_full_needs_one_hour_hold(self):
+        c = self.tripped(); self.recover(c)
+        st = c.controller.state
+        st.cutoff_full_required_ts = coord_mod.time.time() - 20000
+        st.last_full_anchor_ts = coord_mod.time.time() - 600
+        r = run(c._async_manage_full_lock("lead_post_full", "adaptive"))
+        self.assertEqual(r, "awaiting_confirmed_full")
+
+    def test_manual_switch_on_is_respected_and_clears_wait(self):
+        c = self.tripped(); self.recover(c)
+        c.hass.set(SWITCH, "on")
+        r = run(c._async_manage_full_lock("lead_daily_full", "adaptive"))
+        self.assertEqual(r, "already_on_release")
+        self.assertIsNone(c.controller.state.cutoff_full_required_ts)
+
+    def test_recovery_with_switch_already_on_needs_no_wait(self):
+        c = self.tripped()
+        c.hass.set(SWITCH, "on")
+        self.assertEqual(self.recover(c), "recovered_manual_reenable_if_needed")
+        self.assertIsNone(c.controller.state.cutoff_full_required_ts)
+
+
 class TrackerUnit(unittest.TestCase):
     def test_states(self):
         t = switch_confirm.SwitchOffTracker(confirm_after_s=15, alert_after_attempts=3)

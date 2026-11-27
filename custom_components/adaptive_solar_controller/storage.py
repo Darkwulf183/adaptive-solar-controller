@@ -76,6 +76,7 @@ class LearningState:
     hard_cutoff_voltage_v: float = 22.8
     emergency_terminal_voltage_v: float = 22.0  # independent under-load emergency stop
     hard_cutoff_latched: bool = False
+    cutoff_full_required_ts: float | None = None  # v0.4.8: Zeitpunkt der Notabschaltung; Wiedereinschalten erst nach neuem FULL
     low_recovery_mode: str = "Aus"
     low_recovery_runs: list[dict[str, Any]] = field(default_factory=list)
     low_recovery_last_full_ts: float | None = None

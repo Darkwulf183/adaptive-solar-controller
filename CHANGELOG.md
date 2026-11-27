@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.4.8 dev1 (Teststand, nicht veröffentlicht)
+## 0.4.8 dev2 (Teststand, nicht veröffentlicht)
+
+### Wiedereinschalten nach Batterie-Notabschaltung (neu)
+- Nach einer Notabschaltung (Unterspannung) bleibt der Wechselrichter aus, bis ein **neuer FULL-Anker** (jünger als die Abschaltung) bestätigt ist
+  und 1 Stunde gehalten hat. Dann schaltet ASC den Wechselrichter-Schalter selbst wieder ein (`turn_on_sent`).
+- Status: `recovered_wait_for_full` (Sperre aufgehoben, wartet auf FULL), `awaiting_full_after_cutoff` (alter FULL zählt nicht).
+- Schaltest du von Hand ein, wird das respektiert und das Warten beendet. Nur wenn ASC den Schalter selbst ausgeschaltet hat (Schalter steht beim Erholen auf „aus"), übernimmt ASC ihn.
+
+## 0.4.8 dev1
 
 Notstrom-Vorsorge, zwei Lernfehler-Korrekturen aus dem Flight Recorder (24./25.11.2026), Recorder-Erweiterungen.
 Nur im Zweig `dev` und als ZIP; `.storage` vor dem Test sichern.

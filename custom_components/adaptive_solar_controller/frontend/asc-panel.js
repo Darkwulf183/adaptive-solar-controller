@@ -41,6 +41,7 @@ const T = {
   owner_switch_pending: "Schalter wird geprüft", config_changed_manual_recovery: "Konfiguration geändert",
   emergency_off: "Notstrom: Wechselrichter aus", emergency_turn_off_confirmed: "Notstrom: Abschaltung bestätigt", emergency_turn_off_pending: "Notstrom: Abschaltung läuft",
   emergency_already_off: "Notstrom: bereits aus", emergency_manual_on: "Notstrom: von Hand eingeschaltet",
+  recovered_wait_for_full: "Erholt – Wechselrichter geht nach neuem FULL wieder an", awaiting_full_after_cutoff: "Wartet auf neues FULL nach Notabschaltung",
   recovered_manual_reenable_if_needed: "Erholt – Wechselrichter ggf. manuell einschalten",
 };
 const SENSOR_NAMES = { battery_voltage: "Batteriespannung", battery_current: "Batteriestrom", grid: "Netzleistung", inverter_output: "Inverter-Ausgang" };
