@@ -120,6 +120,7 @@ class ControlResult:
     full_charge_opportunity: str
     chemistry_strategy_state: str
     days_since_full: float | None
+    rationing_limit_w: float | None = None
 
 
 class AdaptiveController:
@@ -247,6 +248,11 @@ class AdaptiveController:
                     effective_limit = min_target_w
         if snapshot.battery_v <= snapshot.battery_low_v or self.state.battery_calibration_enabled:
             effective_limit = min_target_w
+
+        # v0.4.9: several poor days ahead -> spread the battery budget (PV headroom stays usable).
+        rationing_w = getattr(plan, "rationing_limit_w", None)
+        if rationing_w is not None and not self.state.battery_calibration_enabled:
+            effective_limit = min(effective_limit, max(min_target_w, rationing_w + max(0.0, snapshot.pv_w)))
 
         lead_zero_target = (
             self.state.battery_chemistry == "lead_acid"
@@ -413,6 +419,7 @@ class AdaptiveController:
             planning_confidence=round(planning_conf*100.0,1),
             planning_reserve_adjustment=round(self.state.planning_reserve_adjustment*100.0,1),
             planner_evaluation=planner_evaluation, horizon_24h_balance_kwh=plan.horizon_24h_balance_kwh,
+            rationing_limit_w=getattr(plan, 'rationing_limit_w', None),
             horizon_48h_balance_kwh=plan.horizon_48h_balance_kwh, horizon_72h_balance_kwh=plan.horizon_72h_balance_kwh,
             full_charge_priority=round(plan.full_charge_priority * 100.0, 1),
             full_charge_opportunity=plan.full_charge_opportunity, chemistry_strategy_state=plan.chemistry_strategy_state,

@@ -4,6 +4,12 @@
 
 Aus der Notabschaltung vom 27.11.2026 (Recorder 24.–27.11.).
 
+### Planer: Energie einteilen (neu)
+- Sind mehrere schwache Tage zu erwarten (48-h- und 72-h-Horizont im Defizit), verteilt ASC das nutzbare Batteriebudget auf die Zeit bis zur nächsten
+  Lademöglichkeit (bis 10:00 Uhr des nächsten Tages plus 24 h je weiterem schwachen Tag) und begrenzt die Ausgangsleistung entsprechend
+  (PV-Leistung kommt oben drauf). Bisher fuhr der Planer den vollen Akku am ersten Abend mit 660 W leer (24.11.). Bei guter Prognose ändert sich nichts.
+  Neue Recorder-Spalte `rationing_limit_w`.
+
 ### Lernen / Batterieschätzung
 - **Messqualität:** Der Zeitabstand zwischen Spannungs- und Stromsensor wird jetzt aus `last_reported` (mit Rückfall auf `last_updated`) gebildet.
   Bisher galt ein über Stunden gleich bleibender Nachtstrom als „veraltet“, dadurch wurden ~41 % aller Messwerte als `degraded` verworfen

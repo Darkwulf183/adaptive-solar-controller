@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from .battery import BatteryEstimate
 from .storage import LearningState
 
@@ -23,6 +23,21 @@ class EnergyPlan:
     full_charge_opportunity: str
     chemistry_strategy_state: str
     days_since_full: float | None
+    rationing_limit_w: float | None = None  # v0.4.9: cap on battery-fed output while several poor days are expected
+    rationing_hours: float | None = None
+
+def rationing_limit_w(budget_kwh: float, now: datetime, deficit_days: int, min_w: float = 0.0) -> tuple[float, float]:
+    """Spread the usable battery budget over the time until the battery can be recharged.
+
+    Hours until the next 10:00 local time (PV usually starts to matter) plus 24 h for each
+    further day that is expected to be energy-poor. Returns (watts, hours).
+    """
+    next_pv = now.replace(hour=10, minute=0, second=0, microsecond=0)
+    if next_pv <= now:
+        next_pv = next_pv + timedelta(days=1)
+    hours = (next_pv - now).total_seconds() / 3600.0 + 24.0 * max(0, deficit_days)
+    hours = max(6.0, hours)
+    return max(min_w, budget_kwh * 1000.0 / hours), hours
 
 class EnergyPlanner:
     """v0.4.3 energy planner: adaptive reserve + multi-day energy horizon."""
@@ -89,6 +104,10 @@ class EnergyPlanner:
             budget = max(0.0, battery.stored_energy_kwh - target_energy)
             reserve_surplus = battery.reserve_fraction - target
             limit_factor = min(limit_factor, max(0.0, min(1.0, reserve_surplus / 0.25)))
+        ration_w = ration_h = None
+        if multi_deficit < -expected_need * 0.6 and expected_need > 0.2:
+            deficit_days = 1 + (1 if (h72 is not None and h72 < -expected_need * 0.6 * 1.5) else 0)
+            ration_w, ration_h = rationing_limit_w(budget, datetime.now().astimezone(), deficit_days)
 
         # v0.4.4 chemistry strategy. LiFePO4 deliberately keeps the v0.4.3
         # energy strategy. Lead-acid adds a slow multi-day FULL objective.
@@ -228,7 +247,8 @@ class EnergyPlanner:
         self.state.target_reserve_fraction = target
         return EnergyPlan(round(budget,3), state, confidence, target, max(0.0,min(1.0,limit_factor)),
                           round(expected_need,3), reason, surplus_available, round(budget,3), surplus_confidence,
-                          h24, h48, h72, round(full_priority,3), full_opportunity, chemistry_state, days_since_full)
+                          h24, h48, h72, round(full_priority,3), full_opportunity, chemistry_state, days_since_full,
+                          None if ration_w is None else round(ration_w, 1), None if ration_h is None else round(ration_h, 1))
 
     def _days_since_full(self) -> float | None:
         ts = self.state.last_full_anchor_ts

@@ -24,7 +24,7 @@ FIELDS = [
     "recent_gap_kwh","gap_classification","surplus_available","surplus_power_w","surplus_energy_kwh","surplus_confidence",
     "battery_chemistry","progressive_gamma","progressive_release_factor","battery_power_envelope_w",
     "power_envelope_confidence","planning_confidence","planning_reserve_adjustment","planner_evaluation",
-    "horizon_24h_balance_kwh","horizon_48h_balance_kwh","horizon_72h_balance_kwh",
+    "horizon_24h_balance_kwh","horizon_48h_balance_kwh","horizon_72h_balance_kwh","rationing_limit_w",
     "full_charge_priority","full_charge_opportunity","chemistry_strategy_state","days_since_full",
     "absorption_elapsed_min","absorption_required_min","absorption_remaining_min","absorption_status","full_anchor_source",
     "calibration_state","blocked_reason","inverter_power_switch","inverter_switch_state","inverter_full_lock_owned","inverter_switch_action",
