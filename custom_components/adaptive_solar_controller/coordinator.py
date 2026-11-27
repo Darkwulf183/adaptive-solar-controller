@@ -428,6 +428,23 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             c["battery_voltage"], c["battery_current"], c["inverter_output"]
         )
 
+    async def _async_notify(self, title: str, message: str, notification_id: str) -> None:
+        """Persistent notification plus optional phone push (cfg notify_service, e.g. notify.mobile_app_x)."""
+        try:
+            persistent_notification.async_create(self.hass, message, title=title, notification_id=notification_id)
+        except Exception:  # never let a notification break the protection path
+            _LOGGER.exception("ASC persistent notification failed")
+        target = str(self.cfg.get("notify_service") or "").strip()
+        if not target:
+            return
+        domain, _, service = target.partition(".")
+        if not service:
+            domain, service = "notify", domain
+        try:
+            await self.hass.services.async_call(domain, service, {"title": title, "message": message}, blocking=False)
+        except Exception:
+            _LOGGER.exception("ASC phone notification via %s failed", target)
+
     async def _async_manage_cutoff(self, battery_v: float | None, battery_a: float | None, inverter_w: float | None) -> str:
         """Stop output on hard undervoltage, with debounce, hysteresis and ownership.
 
@@ -462,6 +479,13 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
                 state.hard_cutoff_latched = True
                 state.cutoff_full_required_ts = time.time()
                 await self.store.async_save(state)
+                await self._async_notify(
+                    "ASC: Notabschaltung",
+                    f"Batterie-Notabschaltung ausgelöst bei {battery_v:.2f} V. Der Wechselrichter wird abgeschaltet "
+                    "und geht erst nach einem neuen FULL wieder an." if not invalid_voltage else
+                    "Batterie-Notabschaltung ausgelöst (Spannungssensor ungültig). Der Wechselrichter wird abgeschaltet.",
+                    "asc_cutoff_trip",
+                )
 
             if not self._cutoff_latched:
                 return verdict if verdict != OK else "ok"
@@ -675,8 +699,13 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             return "turn_on_failed"
         state.inverter_full_lock_owned = False
         state.inverter_full_lock_entity = ""
+        was_cutoff = state.cutoff_full_required_ts is not None
         state.cutoff_full_required_ts = None
         await self.store.async_save(state)
+        if was_cutoff:
+            await self._async_notify("ASC: Wechselrichter wieder an",
+                                     "Neuer FULL bestätigt, der Wechselrichter wurde nach der Notabschaltung wieder eingeschaltet.",
+                                     "asc_cutoff_resume")
         return "turn_on_sent"
 
     async def _async_manage_emergency_reserve(self, entity_id: str, switch, owned: bool) -> str:

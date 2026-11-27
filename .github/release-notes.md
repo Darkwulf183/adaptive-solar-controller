@@ -1,15 +1,20 @@
-**Pre-release, Release Candidate.** Nicht an echter Hardware langzeitgetestet. Vor dem Update `.storage` sichern und die Änderungen unten lesen.
+**Release Candidate.** Vor dem Update `.storage` sichern und die Änderungen unten lesen.
 
 ## Was ist neu
-- **FULL-Sperre:** Wird der Inverter-Schalter in der Konfiguration geändert oder umbenannt, gleicht ASC die gespeicherte Besitzmarke jetzt an. Bisher blieb sie hängen (`config_changed_manual_recovery`) und die Sperre schaltete nicht mehr.
-- **Abschaltbestätigung:** Nach `turn_off` (Batterie-Notabschaltung und FULL-Sperre) prüft ASC, ob der Schalter wirklich `off` meldet, wiederholt den Befehl nach 15 s und meldet nach drei erfolglosen Versuchen eine Benachrichtigung in Home Assistant.
-- **Flight Recorder:** Die erste Zeile nach jedem Start enthält in `events` den Eintrag `ASC_START:<Version>:<Grund>@<Uhrzeit>` (`ha_start` oder `setup_or_reload`). So sind Neustarts in den Aufzeichnungen erkennbar. Das Spaltenschema bleibt gleich.
-- **Tests:** Neue Tests mit simuliertem Home Assistant für Notabschaltung und FULL-Sperre (41 Tests).
+- **Notstrom-Vorsorge:** Neuer Schalter. Ist er an, bleibt der Wechselrichter aus und der Akku wird nur per PV geladen (z. B. vor einem Sturm). Handeinschalten wird respektiert.
+- **Wiedereinschalten nach Notabschaltung:** Der Wechselrichter geht nach einer Unterspannungs-Abschaltung erst mit einem neuen bestätigten FULL-Anker (1 h gehalten) wieder an.
+- **Handy-Benachrichtigung:** Optionales Feld `notify.<dienst>` in der Konfiguration, Push bei Notabschaltung und beim Wiedereinschalten.
+- **FULL-Lernen:** Der FULL-Spitzenwert gilt nur noch pro Ladephase (max. gelernt + 0,3 V). Ein alter Ausreißer blockiert FULL nicht mehr. Neuer Knopf *Reset learned full charge voltage*.
+- **FULL-Zyklus:** Eine kurze PV-Zwischenladung beendet den Zyklus nicht mehr, Entladung wird netto gerechnet, FULL-Anker gilt 5 Tage. Niedrig-Anker und Kapazitätslernen werden nicht mehr zu Unrecht abgelehnt.
+- **Panel:** Entitäten aus der Konfiguration, Notstrom-Schalter und -Hinweis, Reset-Knopf, Status der Wechselrichter-Sperre, Recorder-Download, deutsche Texte.
+- **Versionsnummer** kommt überall aus `manifest.json` (neuer Sensor *ASC version*). Neuer Sensor *Inverter switch status*.
+- **Flight Recorder:** Zeilen auch bei pausierter Regelung, neue Spalten `emergency_reserve`, `cutoff_credit_v`, `cutoff_relaxed_v`.
+- **Tests:** 84 Tests mit simuliertem Home Assistant.
 
 ## Wichtig beim Update
-Greift die Notfallregel der Blei-Säure-Strategie (Standard: nach 10 Tagen ohne FULL), schaltet ASC den Wechselrichter über den konfigurierten Schalter ab und hält ihn aus, bis eine Vollladung bestätigt ist. Das passiert nach der Korrektur auch dann, wenn der Schalter geändert oder umbenannt wurde. Einstellungen und Gelerntes bleiben erhalten.
+Nach dem Einspielen Home Assistant neu starten und den Browser-Cache leeren (Strg+F5), damit das neue Panel geladen wird. Einstellungen und Gelerntes bleiben erhalten. Das Handy-Feld ist leer, bis du es in den Optionen einträgst.
 
 ## Installation
-HACS → Benutzerdefinierte Repositories → `https://github.com/Darkwulf183/adaptive-solar-controller` (Kategorie Integration), „Beta-Versionen anzeigen“ aktivieren, herunterladen, Home Assistant neu starten.
+HACS → Benutzerdefinierte Repositories → `https://github.com/Darkwulf183/adaptive-solar-controller` (Kategorie Integration), herunterladen, Home Assistant neu starten.
 
 Der gesamte Verlauf steht im [CHANGELOG](https://github.com/Darkwulf183/adaptive-solar-controller/blob/main/CHANGELOG.md). Entstanden in Zusammenarbeit von Darkwulf183, ChatGPT und Claude.

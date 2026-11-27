@@ -30,6 +30,7 @@
           "max_step_w": "Maximum normal change per cycle",
           "hard_max_w": "Absolute inverter maximum power",
           "inverter_power_switch": "Inverter power switch (optional, for emergency cutoff/FULL hold)",
+          "notify_service": "Phone notification on emergency cutoff (optional, e.g. notify.mobile_app_myphone)",
           "absorption_voltage_v": "Absorption voltage",
           "absorption_tolerance_v": "Absorption tolerance",
           "absorption_minutes": "Absorption time for FULL"
@@ -63,6 +64,7 @@
           "max_step_w": "Maximum normal change per cycle",
           "hard_max_w": "Absolute inverter maximum power",
           "inverter_power_switch": "Inverter power switch (optional, for emergency cutoff/FULL hold)",
+          "notify_service": "Phone notification on emergency cutoff (optional, e.g. notify.mobile_app_myphone)",
           "absorption_voltage_v": "Absorption voltage",
           "absorption_tolerance_v": "Absorption tolerance",
           "absorption_minutes": "Absorption time for FULL"
@@ -104,6 +106,7 @@
           "max_step_w": "Maximum normal change per cycle",
           "hard_max_w": "Absolute inverter maximum power",
           "inverter_power_switch": "Inverter power switch (optional, for emergency cutoff/FULL hold)",
+          "notify_service": "Phone notification on emergency cutoff (optional, e.g. notify.mobile_app_myphone)",
           "absorption_voltage_v": "Absorption voltage",
           "absorption_tolerance_v": "Absorption tolerance",
           "absorption_minutes": "Absorption time for FULL"

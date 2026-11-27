@@ -6,7 +6,7 @@ wie viel Batterieenergie bis zur nächsten ausreichenden PV-Ladung sicher genutz
 
 [![HACS Custom Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Darkwulf183&repository=adaptive-solar-controller&category=integration)
 
-> **Status: Release Candidate (0.4.7 RC1), Weg zu 0.5.0.** Die Software greift in die Steuerung eines
+> **Status: Release Candidate (0.4.8 RC1), Weg zu 0.5.0.** Die Software greift in die Steuerung eines
 > Wechselrichters ein und kann ihn bei Unterspannung abschalten. Sie ist nicht über längere Zeit an
 > verschiedenen Anlagen getestet und **ersetzt keinen Hardware-Batterieschutz und kein BMS**.
 > Nutzung auf eigene Verantwortung, zuerst im Modus `monitor` beobachten.

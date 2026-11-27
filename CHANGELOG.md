@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.4.8 dev2 (Teststand, nicht veröffentlicht)
+## 0.4.8 RC1
+
+(Zusammenfassung der Teststände dev1 und dev2.)
+
+### Handy-Benachrichtigung bei Notabschaltung (neu)
+- Neues optionales Feld in der Konfiguration: **Handy-Benachrichtigung** (z. B. `notify.mobile_app_meinhandy`). Bei einer Batterie-Notabschaltung
+  sendet ASC eine Push-Nachricht, bei Wiedereinschalten nach FULL ebenfalls. Zusätzlich immer eine Benachrichtigung in Home Assistant.
+  Ein fehlender oder fehlerhafter Dienst stört die Abschaltung nicht.
+
 
 ### Wiedereinschalten nach Batterie-Notabschaltung (neu)
 - Nach einer Notabschaltung (Unterspannung) bleibt der Wechselrichter aus, bis ein **neuer FULL-Anker** (jünger als die Abschaltung) bestätigt ist

@@ -82,10 +82,10 @@ class FakeHass:
     def set(self, entity_id, state): self.data[entity_id] = _State(state)
 
     async def async_call(self, domain, service, data, blocking=False):
-        self.calls.append((domain, service, data["entity_id"]))
+        self.calls.append((domain, service, data.get("entity_id", data.get("message"))))
         if self.fail:
             raise RuntimeError("boom")
-        if service == "turn_off" and self.follow_command:
+        if service == "turn_off" and self.follow_command and "entity_id" in data:
             self.data[data["entity_id"]] = _State("off")
 
 
@@ -333,6 +333,44 @@ class CutoffRecoveryFlow(unittest.TestCase):
         r = run(c._async_manage_full_lock("lead_daily_full", "adaptive"))
         self.assertEqual(r, "already_on_release")
         self.assertIsNone(c.controller.state.cutoff_full_required_ts)
+
+    def test_trip_sends_phone_notification_once(self):
+        c = make()
+        c.cfg["notify_service"] = "notify.mobile_app_test"
+        for _ in range(8):
+            run(c._async_manage_cutoff(22.5, -5.0, 300.0)); self.clock.advance(10)
+        pushes = [x for x in c.hass.calls if x[0] == "notify"]
+        self.assertEqual(len(pushes), 1)
+        self.assertEqual(pushes[0][1], "mobile_app_test")
+        self.assertIn("asc_cutoff_trip", NOTES.created)
+
+    def test_no_phone_service_configured_only_persistent_notification(self):
+        c = self.tripped()
+        self.assertEqual([x for x in c.hass.calls if x[0] == "notify"], [])
+        self.assertIn("asc_cutoff_trip", NOTES.created)
+
+    def test_failing_phone_service_does_not_break_the_cutoff(self):
+        c = make()
+        c.cfg["notify_service"] = "notify.kaputt"
+        c.hass.fail = False
+        orig = c.hass.async_call
+        async def flaky(domain, service, data, blocking=False):
+            if domain == "notify": raise RuntimeError("no such service")
+            return await orig(domain, service, data, blocking)
+        c.hass.async_call = flaky
+        for _ in range(5):
+            run(c._async_manage_cutoff(22.5, -5.0, 300.0)); self.clock.advance(10)
+        self.assertTrue(c._cutoff_latched)
+        self.assertEqual(c.hass.get(SWITCH).state, "off")
+
+    def test_resume_sends_phone_notification(self):
+        c = self.tripped(); c.cfg["notify_service"] = "notify.mobile_app_test"
+        self.recover(c)
+        st = c.controller.state
+        st.cutoff_full_required_ts = coord_mod.time.time() - 20000
+        st.last_full_anchor_ts = coord_mod.time.time() - 4000
+        run(c._async_manage_full_lock("lead_post_full", "adaptive"))
+        self.assertEqual(len([x for x in c.hass.calls if x[0] == "notify"]), 1)
 
     def test_recovery_with_switch_already_on_needs_no_wait(self):
         c = self.tripped()

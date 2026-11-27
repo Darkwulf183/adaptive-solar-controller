@@ -63,6 +63,9 @@ def _schema(values: dict | None = None) -> vol.Schema:
 
     _optional_entity(schema, CONF_INVERTER_POWER_SWITCH, values, domain="switch")
 
+    _notify = values.get(CONF_NOTIFY_SERVICE, DEFAULTS.get(CONF_NOTIFY_SERVICE, ""))
+    schema[vol.Optional(CONF_NOTIFY_SERVICE, default=_notify or "")] = selector.TextSelector()
+
     for key in FORECAST_FIELDS:
         _optional_entity(schema, key, values)
 

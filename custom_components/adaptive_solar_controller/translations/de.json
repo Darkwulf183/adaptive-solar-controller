@@ -30,6 +30,7 @@
           "max_step_w": "Maximale normale Änderung je Zyklus",
           "hard_max_w": "Absolute Inverter-Maximalleistung",
           "inverter_power_switch": "Inverter-Power-Schalter (optional, für Notabschaltung/FULL-Sperre)",
+          "notify_service": "Handy-Benachrichtigung bei Notabschaltung (optional, z. B. notify.mobile_app_meinhandy)",
           "absorption_voltage_v": "Absorptionsspannung",
           "absorption_tolerance_v": "Absorptions-Toleranz",
           "absorption_minutes": "Absorptionszeit für FULL"
@@ -63,6 +64,7 @@
           "max_step_w": "Maximale normale Änderung je Zyklus",
           "hard_max_w": "Absolute Inverter-Maximalleistung",
           "inverter_power_switch": "Inverter-Power-Schalter (optional, für Notabschaltung/FULL-Sperre)",
+          "notify_service": "Handy-Benachrichtigung bei Notabschaltung (optional, z. B. notify.mobile_app_meinhandy)",
           "absorption_voltage_v": "Absorptionsspannung",
           "absorption_tolerance_v": "Absorptions-Toleranz",
           "absorption_minutes": "Absorptionszeit für FULL"
@@ -104,6 +106,7 @@
           "max_step_w": "Maximale normale Änderung je Zyklus",
           "hard_max_w": "Absolute Inverter-Maximalleistung",
           "inverter_power_switch": "Inverter-Power-Schalter (optional, für Notabschaltung/FULL-Sperre)",
+          "notify_service": "Handy-Benachrichtigung bei Notabschaltung (optional, z. B. notify.mobile_app_meinhandy)",
           "absorption_voltage_v": "Absorptionsspannung",
           "absorption_tolerance_v": "Absorptions-Toleranz",
           "absorption_minutes": "Absorptionszeit für FULL"
