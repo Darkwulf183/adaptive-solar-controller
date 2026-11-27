@@ -101,3 +101,25 @@ class ResetFullVoltageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FloorGuardTests(unittest.TestCase):
+    def test_high_reserve_is_capped_near_the_cutoff_under_small_load(self):
+        st, est = make(stored_energy_kwh=5.0, usable_capacity_estimate_kwh=9.5, energy_anchor_seen=True)
+        run(est, 600, start=T0, v=22.85, a=-2.2, pv=0.0, out=40.0)
+        self.assertLessEqual(st.stored_energy_kwh, 0.10 * 9.5 + 1e-6)
+
+    def test_not_capped_under_heavy_load_sag(self):
+        st, est = make(stored_energy_kwh=5.0, usable_capacity_estimate_kwh=9.5, energy_anchor_seen=True)
+        run(est, 600, start=T0, v=22.9, a=-30.0, pv=0.0, out=660.0)
+        self.assertGreater(st.stored_energy_kwh, 3.0)
+
+    def test_not_capped_while_voltage_is_healthy(self):
+        st, est = make(stored_energy_kwh=5.0, usable_capacity_estimate_kwh=9.5, energy_anchor_seen=True)
+        run(est, 900, start=T0, v=24.5, a=-2.2, pv=0.0, out=40.0)
+        self.assertGreater(st.stored_energy_kwh, 4.5)
+
+    def test_short_dip_does_not_cap(self):
+        st, est = make(stored_energy_kwh=5.0, usable_capacity_estimate_kwh=9.5, energy_anchor_seen=True)
+        run(est, 120, start=T0, v=22.85, a=-2.2, pv=0.0, out=40.0)
+        self.assertGreater(st.stored_energy_kwh, 4.5)

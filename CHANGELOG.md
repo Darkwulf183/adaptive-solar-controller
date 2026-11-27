@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.9 dev1 (Teststand, nicht veröffentlicht)
+
+Aus der Notabschaltung vom 27.11.2026 (Recorder 24.–27.11.).
+
+### Lernen / Batterieschätzung
+- **Messqualität:** Der Zeitabstand zwischen Spannungs- und Stromsensor wird jetzt aus `last_reported` (mit Rückfall auf `last_updated`) gebildet.
+  Bisher galt ein über Stunden gleich bleibender Nachtstrom als „veraltet“, dadurch wurden ~41 % aller Messwerte als `degraded` verworfen
+  (keine Energie-Integration, keine Plausibilitätskorrektur). Folge war eine zu hohe Reserveschätzung (52 % bei 22,85 V).
+- **Spannungs-Untergrenze:** Nahe der Abschaltgrenze (≤ Grenze + 0,25 V) bei kleiner Last (0,3–5 A Entladung), 5 Minuten lang, wird die geschätzte
+  Reserve auf höchstens 10 % der Kapazität begrenzt (Ereignis `RESERVE_CAPPED_BY_VOLTAGE`).
+
 ## 0.4.8 RC1
 
 (Zusammenfassung der Teststände dev1 und dev2.)

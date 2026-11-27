@@ -761,8 +761,19 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         # v0.4.2.2+: battery-energy integration must never depend on the PV
         # entity timestamp (PV can remain unchanged at 0 W all night). V*A uses
         # only the synchronized battery voltage/current timestamps.
+        # v0.4.9: HA only moves last_updated when the VALUE changes. A steady night current
+        # (e.g. -2.2 A) kept its old stamp while the voltage kept moving, so the spread grew to
+        # minutes and ~40 % of all samples were rejected as "degraded" (battery energy was not
+        # integrated, the reserve estimate drifted high). last_reported moves on every report of
+        # the sensor, also when the value is unchanged, so a live sensor stays "synced".
         states = [self._state(self.cfg.get(k)) for k in (CONF_BATTERY_VOLTAGE_SENSOR, CONF_BATTERY_CURRENT_SENSOR)]
-        stamps = [st.last_updated.timestamp() for st in states if st is not None]
+        stamps = []
+        for st in states:
+            if st is None:
+                continue
+            seen = [t for t in (getattr(st, "last_updated", None), getattr(st, "last_reported", None)) if t is not None]
+            if seen:
+                stamps.append(max(t.timestamp() for t in seen))
         return max(stamps) - min(stamps) if len(stamps) >= 2 else 999.0
 
     def _snapshot(self) -> PlantSnapshot:

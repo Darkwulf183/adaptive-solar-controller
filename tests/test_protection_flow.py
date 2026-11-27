@@ -462,3 +462,30 @@ class EmergencyReserveFlow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MeasurementSpread(unittest.TestCase):
+    """v0.4.9: an unchanged value must not look stale (HA keeps last_updated, moves last_reported)."""
+    class _S:
+        def __init__(self, upd, rep=None):
+            import datetime as dt
+            self.last_updated = dt.datetime.fromtimestamp(upd)
+            self.last_reported = dt.datetime.fromtimestamp(rep) if rep is not None else None
+
+    def _coord(self, v, a):
+        c = make()
+        c.cfg.update({"battery_voltage_sensor": "sensor.v", "battery_current_sensor": "sensor.a"})
+        c.hass.data = {"sensor.v": v, "sensor.a": a}
+        return c
+
+    def test_steady_current_with_fresh_report_is_synced(self):
+        c = self._coord(self._S(1000.0, 1100.0), self._S(100.0, 1099.0))
+        self.assertLess(c._measurement_spread_s(), 5.0)
+
+    def test_without_last_reported_falls_back_to_last_updated(self):
+        c = self._coord(self._S(1000.0), self._S(990.0))
+        self.assertAlmostEqual(c._measurement_spread_s(), 10.0, places=3)
+
+    def test_really_stale_sensor_is_still_degraded(self):
+        c = self._coord(self._S(1000.0, 1100.0), self._S(100.0, 500.0))
+        self.assertGreater(c._measurement_spread_s(), 5.0)

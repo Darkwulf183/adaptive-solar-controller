@@ -63,12 +63,20 @@ class BatteryEstimator:
     FULL_PEAK_STEP_V = 0.3
     FULL_CYCLE_MAX_AGE_S = 5 * 24 * 3600.0  # FULL anchor older than this no longer defines a cycle
     LOW_ANCHOR_CONFIRM_S = 90.0
+    # v0.4.9: voltage floor guard. Close to the cutoff under SMALL load the terminal voltage is a
+    # trustworthy "nearly empty" signal; the energy estimate may then not stay high (27.11.: 52 %
+    # reserve at 22.85 V, two nights before the cutoff).
+    FLOOR_GUARD_MARGIN_V = 0.25
+    FLOOR_GUARD_MAX_LOAD_A = 5.0
+    FLOOR_GUARD_CONFIRM_S = 300.0
+    FLOOR_GUARD_MAX_FRACTION = 0.10
     LOW_ANCHOR_RELEASE_MARGIN_V = 0.55
     LOW_ANCHOR_RELEASE_CONFIRM_S = 180.0
 
     def __init__(self, state: LearningState) -> None:
         self.state = state
         self._peak_ceiling_v: float | None = None
+        self._floor_guard_hold_s = 0.0
         self.absorption_voltage_v = 29.4
         self.absorption_tolerance_v = 0.4
         self.absorption_minutes = 120.0
@@ -135,6 +143,7 @@ class BatteryEstimator:
             capacity = self._effective_capacity()
 
         self._passive_voltage_plausibility(dt, battery_v, battery_a, hard_low_v, capacity, quality_ok)
+        self._voltage_floor_guard(dt, battery_v, battery_a, hard_low_v, capacity, quality_ok, events)
 
         calibration_complete = self._learn_transition(
             dt, battery_v, battery_a, pv_w, hard_low_v, calibration_enabled, events
@@ -345,6 +354,22 @@ class BatteryEstimator:
         # cannot recreate the old charge-current voltage bias.
         correction = max(-0.01, min(0.01, error * 0.02)) * capacity
         self.state.stored_energy_kwh = max(0.0, min(capacity, self.state.stored_energy_kwh + correction))
+
+    def _voltage_floor_guard(self, dt: float, battery_v: float, battery_a: float, hard_low_v: float,
+                             capacity: float, quality_ok: bool, events: list[str]) -> None:
+        near_floor = (battery_v <= hard_low_v + self.FLOOR_GUARD_MARGIN_V
+                      and -self.FLOOR_GUARD_MAX_LOAD_A <= battery_a <= -0.3)
+        if not near_floor:
+            self._floor_guard_hold_s = 0.0
+            return
+        if quality_ok:
+            self._floor_guard_hold_s += dt
+        if self._floor_guard_hold_s < self.FLOOR_GUARD_CONFIRM_S:
+            return
+        cap = self.FLOOR_GUARD_MAX_FRACTION * capacity
+        if self.state.stored_energy_kwh > cap:
+            self.state.stored_energy_kwh = cap
+            events.append("RESERVE_CAPPED_BY_VOLTAGE")
 
     def _update_charge_state(self, dt: float, battery_a: float, pv_w: float, events: list[str]) -> None:
         start_ok = pv_w >= self.START_PV_W and battery_a >= self.START_BATTERY_A
