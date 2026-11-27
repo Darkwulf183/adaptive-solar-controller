@@ -131,6 +131,7 @@ SENSORS = [
 
     # Diagnostics
     ASCSensorDescription(key="flight_recorder_path", name="Flight recorder file", icon="mdi:file-delimited-outline", data_key="flight_recorder_path"),
+    ASCSensorDescription(key="backup_output", name="Backup inverter output", native_unit_of_measurement=UnitOfPower.WATT, device_class=SensorDeviceClass.POWER, state_class=SensorStateClass.MEASUREMENT, icon="mdi:solar-power", data_key="backup_output_w"),
     ASCSensorDescription(key="inverter_switch_status", name="Inverter switch status", icon="mdi:power-plug-outline", data_key="inverter_switch_action"),
     ASCSensorDescription(key="version", name="ASC version", icon="mdi:tag-outline", entity_category=EntityCategory.DIAGNOSTIC, data_key="version"),
     ASCSensorDescription(key="events", name="ASC event marker", icon="mdi:flag-outline", data_key="events"),

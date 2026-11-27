@@ -57,3 +57,42 @@ class FolderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PruneTests(unittest.TestCase):
+    def _folder(self, names):
+        import tempfile, pathlib
+        d = pathlib.Path(tempfile.mkdtemp())
+        for n in names:
+            (d / n).write_text("x")
+        return d
+
+    def test_old_recorder_files_are_deleted_new_and_foreign_files_stay(self):
+        import datetime as dt
+        today = dt.date(2026, 11, 27)
+        d = self._folder([
+            "ASC_v0.4.6_FlightRecorder_2026-07-01.csv",        # alt
+            "ASC_v0.4.6_FlightRecorder_2026-07-01_old2.csv",   # alt, Archiv
+            "ASC_v0.4.6_FlightRecorder_2026-11-26.csv",        # neu
+            "ASC_v0.4.6_FlightRecorder_2026-11-27.csv",        # heute
+            "meine_notizen_2026-01-01.csv",                    # fremd
+            "ASC_v0.4.6_FlightRecorder_2026-01-01.csv.bak",    # fremd (kein .csv am Ende)
+        ])
+        gone = rf.prune(d, today, 120)
+        self.assertEqual(gone, ["ASC_v0.4.6_FlightRecorder_2026-07-01.csv", "ASC_v0.4.6_FlightRecorder_2026-07-01_old2.csv"])
+        left = sorted(p.name for p in d.iterdir())
+        self.assertIn("ASC_v0.4.6_FlightRecorder_2026-11-27.csv", left)
+        self.assertIn("ASC_v0.4.6_FlightRecorder_2026-11-26.csv", left)
+        self.assertIn("meine_notizen_2026-01-01.csv", left)
+        self.assertIn("ASC_v0.4.6_FlightRecorder_2026-01-01.csv.bak", left)
+        self.assertNotIn("ASC_v0.4.6_FlightRecorder_2026-07-01.csv", left)
+
+    def test_zero_disables_rotation(self):
+        import datetime as dt
+        d = self._folder(["ASC_v0.4.6_FlightRecorder_2020-01-01.csv"])
+        self.assertEqual(rf.prune(d, dt.date(2026, 11, 27), 0), [])
+        self.assertEqual(len(list(d.iterdir())), 1)
+
+    def test_missing_folder_is_not_an_error(self):
+        import datetime as dt, pathlib
+        self.assertEqual(rf.prune(pathlib.Path("/nonexistent/asc"), dt.date(2026, 11, 27)), [])

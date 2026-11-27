@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 from pathlib import Path
 
 FOLDER = "adaptive_solar_controller"
@@ -41,3 +42,40 @@ def resolve(folder: Path, name: str) -> Path | None:
     except OSError:
         return None
     return None
+
+
+DATE_RE = re.compile(r"_FlightRecorder_(\d{4}-\d{2}-\d{2})")
+RETENTION_DAYS = 120
+
+
+def prune(folder: Path, today: date, keep_days: int = RETENTION_DAYS) -> list[str]:
+    """Delete recorder files older than ``keep_days`` (by the date in the file name).
+
+    Only plain recorder file names are touched, never today's file, never anything else.
+    Returns the deleted names. ``keep_days <= 0`` disables the rotation.
+    """
+    if keep_days <= 0:
+        return []
+    limit = today - timedelta(days=keep_days)
+    deleted: list[str] = []
+    try:
+        entries = list(folder.iterdir())
+    except OSError:
+        return deleted
+    for p in entries:
+        if not valid_name(p.name) or not p.is_file() or p.is_symlink():
+            continue
+        m = DATE_RE.search(p.name)
+        if not m:
+            continue
+        try:
+            day = date.fromisoformat(m.group(1))
+        except ValueError:
+            continue
+        if day < limit:
+            try:
+                p.unlink()
+                deleted.append(p.name)
+            except OSError:
+                continue
+    return sorted(deleted)

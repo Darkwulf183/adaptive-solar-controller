@@ -25,6 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         InverterMaxPowerNumber(hass.data[DOMAIN][entry.entry_id], entry),
         BatteryHardCutoffNumber(hass.data[DOMAIN][entry.entry_id], entry),
         BatteryEmergencyVoltageNumber(hass.data[DOMAIN][entry.entry_id], entry),
+        FullEmergencyDaysNumber(hass.data[DOMAIN][entry.entry_id], entry),
     ])
 
 
@@ -153,4 +154,29 @@ class BatteryEmergencyVoltageNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float):
         await self.coordinator.async_set_emergency_terminal_voltage(value)
+        self.async_write_ha_state()
+
+
+class FullEmergencyDaysNumber(CoordinatorEntity, NumberEntity):
+    """Days without FULL until the lead-acid emergency FULL lock (inverter off) starts."""
+    _attr_has_entity_name = True
+    _attr_name = "FULL emergency after days"
+    _attr_icon = "mdi:calendar-alert"
+    _attr_native_min_value = 9
+    _attr_native_max_value = 21
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = UnitOfTime.DAYS
+    _attr_mode = NumberMode.SLIDER
+
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_full_emergency_days"
+        self._attr_device_info = {"identifiers": {(DOMAIN, entry.entry_id)}, "name": "Adaptive Solar Controller", "manufacturer": AUTHORS, "model": f"ASC v{VERSION}"}
+
+    @property
+    def native_value(self):
+        return float(self.coordinator.controller.state.lead_emergency_days)
+
+    async def async_set_native_value(self, value: float):
+        await self.coordinator.async_set_emergency_days(value)
         self.async_write_ha_state()

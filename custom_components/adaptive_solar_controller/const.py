@@ -29,6 +29,7 @@ CONF_BACKUP_INVERTER = "backup_inverter"
 CONF_SOLAR_ENABLE = "solar_enable"
 CONF_INVERTER_POWER_SWITCH = "inverter_power_switch"
 CONF_NOTIFY_SERVICE = "notify_service"
+CONF_BACKUP_POWER_SENSOR = "backup_power_sensor"
 CONF_GRID_TARGET = "grid_target"
 CONF_BACKUP_BLOCK_W = "backup_block_w"
 CONF_MIN_TARGET_W = "min_target_w"
@@ -61,6 +62,7 @@ DEFAULTS = {
     CONF_SOLAR_ENABLE: "switch.input_solar",
     CONF_INVERTER_POWER_SWITCH: "",
     CONF_NOTIFY_SERVICE: "",
+    CONF_BACKUP_POWER_SENSOR: "",
     CONF_GRID_TARGET: 15.0,
     CONF_BACKUP_BLOCK_W: 40.0,
     CONF_MIN_TARGET_W: 30.0,

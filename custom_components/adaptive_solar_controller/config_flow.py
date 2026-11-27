@@ -53,6 +53,7 @@ def _schema(values: dict | None = None) -> vol.Schema:
         schema[vol.Required(key, default=values.get(key, DEFAULTS[key]))] = _entity_selector(domain)
 
     _optional_entity(schema, CONF_BATTERY_POWER_SENSOR, values)
+    _optional_entity(schema, CONF_BACKUP_POWER_SENSOR, values)
 
     schema[
         vol.Required(

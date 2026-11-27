@@ -489,3 +489,30 @@ class MeasurementSpread(unittest.TestCase):
     def test_really_stale_sensor_is_still_degraded(self):
         c = self._coord(self._S(1000.0, 1100.0), self._S(100.0, 500.0))
         self.assertGreater(c._measurement_spread_s(), 5.0)
+
+
+class EmergencyDaysSetting(unittest.TestCase):
+    def _c(self):
+        c = make()
+        async def noop(*a, **k): return None
+        c.async_request_refresh = noop
+        return c
+
+    def test_value_is_clamped_and_rounded(self):
+        c = self._c()
+        for given, expected in ((12, 12.0), (3, 9.0), (99, 21.0), (10.4, 10.0)):
+            run(c.async_set_emergency_days(given))
+            self.assertEqual(c.controller.state.lead_emergency_days, expected)
+
+
+class BackupOutputRead(unittest.TestCase):
+    def test_not_configured_is_none(self):
+        self.assertIsNone(make()._backup_output_w())
+
+    def test_reads_configured_sensor_and_ignores_unavailable(self):
+        c = make()
+        c.cfg["backup_power_sensor"] = "sensor.ez1_power"
+        c.hass.set("sensor.ez1_power", "287.46")
+        self.assertEqual(c._backup_output_w(), 287.5)
+        c.hass.set("sensor.ez1_power", "unavailable")
+        self.assertIsNone(c._backup_output_w())

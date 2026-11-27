@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.core import CoreState, HomeAssistant
 
 from .const import VERSION
+from .recorder_files import RETENTION_DAYS, prune
 from .start_marker import build_start_marker
 
 
@@ -27,18 +28,19 @@ FIELDS = [
     "horizon_24h_balance_kwh","horizon_48h_balance_kwh","horizon_72h_balance_kwh","rationing_limit_w",
     "full_charge_priority","full_charge_opportunity","chemistry_strategy_state","days_since_full",
     "absorption_elapsed_min","absorption_required_min","absorption_remaining_min","absorption_status","full_anchor_source",
-    "calibration_state","blocked_reason","inverter_power_switch","inverter_switch_state","inverter_full_lock_owned","inverter_switch_action",
+    "calibration_state","blocked_reason","inverter_power_switch","inverter_switch_state","inverter_full_lock_owned","inverter_switch_action","backup_output_w",
     "emergency_reserve","cutoff_credit_v","cutoff_relaxed_v",
 ]
 
 
 class FlightRecorder:
-    """Daily ASC flight recorder. Existing recorder files are never deleted or trimmed."""
+    """Daily ASC flight recorder. Files older than RETENTION_DAYS (120) are removed once per day."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
         self.hass = hass
         self.entry_id = entry_id
         self._ok_path: Path | None = None  # file whose header was already verified
+        self._pruned_day: str | None = None
         # Wird an das Feld `events` der ersten geschriebenen Zeile gehängt, damit
         # Neustarts und Neuladen in den Aufzeichnungen sichtbar sind (nicht nur als Lücke).
         self._start_marker: str | None = build_start_marker(
@@ -66,6 +68,13 @@ class FlightRecorder:
             self._start_marker = None
         path = self.path
         path.parent.mkdir(parents=True, exist_ok=True)
+        today = datetime.now().astimezone().date()
+        if self._pruned_day != today.isoformat():
+            self._pruned_day = today.isoformat()
+            try:
+                prune(path.parent, today, RETENTION_DAYS)
+            except Exception:  # rotation must never stop the recorder
+                pass
         exists = path.exists() and path.stat().st_size > 0
 
         if exists and self._ok_path == path:

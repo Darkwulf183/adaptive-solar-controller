@@ -132,6 +132,13 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         await self.store.async_save(state)
         await self.async_request_refresh()
 
+    async def async_set_emergency_days(self, value: float) -> None:
+        """Days without FULL after which the lead-acid emergency FULL lock starts (v0.4.9, was fixed 10)."""
+        state = self.controller.state
+        state.lead_emergency_days = max(9.0, min(21.0, float(round(float(value)))))
+        await self.store.async_save(state)
+        await self.async_request_refresh()
+
     async def async_set_low_recovery_mode(self, mode: str) -> None:
         if mode not in ("Aus", "Automatisch", "Gezielt"):
             return
@@ -757,6 +764,14 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
         await self.store.async_save(state)
         await self.async_request_refresh()
 
+    def _backup_output_w(self) -> float | None:
+        """Read-only: actual output power of the backup inverter (EZ1), None when not configured/unavailable."""
+        entity = self.cfg.get("backup_power_sensor") or ""
+        if not entity:
+            return None
+        value = self._float_entity(entity, None)
+        return None if value is None else round(float(value), 1)
+
     def _measurement_spread_s(self) -> float:
         # v0.4.2.2+: battery-energy integration must never depend on the PV
         # entity timestamp (PV can remain unchanged at 0 W all night). V*A uses
@@ -852,7 +867,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             "battery_energy_charged_total_kwh":s.battery_energy_charged_total_kwh if s else 0.0,
             "battery_energy_discharged_total_kwh":s.battery_energy_discharged_total_kwh if s else 0.0,
             "hard_cutoff_voltage_v":s.hard_cutoff_voltage_v if s else 22.8,
-            "hard_cutoff_status":self._last_cutoff_status, "flight_recorder_path":str(self.recorder.path), "version":VERSION, "inverter_switch_action":None, "events":"",
+            "hard_cutoff_status":self._last_cutoff_status, "flight_recorder_path":str(self.recorder.path), "version":VERSION, "inverter_switch_action":None, "backup_output_w":self._backup_output_w(), "events":"",
         }
 
     async def _async_update_data(self) -> dict:
@@ -975,7 +990,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
             "battery_energy_discharged_total_kwh":self.controller.state.battery_energy_discharged_total_kwh,
             "actual_pv_today_kwh":snap.daily_production_kwh,
             "corrected_forecast_today_total_kwh":None if snap.daily_production_kwh is None or result.corrected_forecast_remaining_kwh is None else round(snap.daily_production_kwh + result.corrected_forecast_remaining_kwh,3),
-            "flight_recorder_path":str(self.recorder.path), "version":VERSION, "inverter_switch_action":switch_action, "events":",".join(result.events),
+            "flight_recorder_path":str(self.recorder.path), "version":VERSION, "inverter_switch_action":switch_action, "backup_output_w":self._backup_output_w(), "events":",".join(result.events),
         }
 
         if self.controller.state.flight_recorder_enabled:
@@ -1041,7 +1056,7 @@ class AdaptiveSolarCoordinator(DataUpdateCoordinator[dict]):
                 "hard_cutoff_voltage_v":self.controller.state.hard_cutoff_voltage_v,
             "hard_cutoff_status":cutoff_action,
             "inverter_power_switch":inverter_switch_entity, "inverter_switch_state":inverter_switch_state,
-                "inverter_full_lock_owned":self.controller.state.inverter_full_lock_owned, "inverter_switch_action":switch_action,
+                "inverter_full_lock_owned":self.controller.state.inverter_full_lock_owned, "inverter_switch_action":switch_action, "backup_output_w":self._backup_output_w(),
             })
 
         self._cycles_since_save += 1

@@ -82,7 +82,7 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
     historyDays:"sensor.adaptive_solar_controller_seasonal_history_days",
     battery:E.battery,current:E.current,pv:E.pv,events:"sensor.adaptive_solar_controller_asc_event_marker",flight:"sensor.adaptive_solar_controller_flight_recorder_file",
     switchStatus:"sensor.adaptive_solar_controller_inverter_switch_status",emergency:"switch.adaptive_solar_controller_emergency_power_reserve",resetFull:"button.adaptive_solar_controller_reset_learned_full_charge_voltage",fullVoltage:"sensor.adaptive_solar_controller_learned_full_charge_voltage",
-    load:"sensor.adaptive_solar_controller_estimated_house_load",predLoad:"sensor.adaptive_solar_controller_predicted_load"
+    backupOut:"sensor.adaptive_solar_controller_backup_inverter_output",load:"sensor.adaptive_solar_controller_estimated_house_load",predLoad:"sensor.adaptive_solar_controller_predicted_load"
   }; }
   get ids() { return this._ids || (this._ids = Object.values(this.cfg)); }
 
@@ -332,7 +332,7 @@ class AdaptiveSolarControllerPanel extends HTMLElement {
       ${this.meter("Kapazität", c.capacityConf)}${this.meter("Energiezustand", c.energyConf)}${this.meter("Planung", c.planningConf)}
       ${this.meter("Leistungs-Envelope", c.envelopeConf)}${this.meter("Überschuss", c.surplusConf)}${this.meter("Saison-Modell", c.seasonalConf)}${this.meter("Forecast", c.forecast)}`, { icon: "🧠" });
     const env = this.card("Leistungs-Envelope", `
-      ${this.row("Akku erlaubt momentan", c.envelope, 0, "W")}${this.row("Effektives Inverter-Limit", c.limit, 0, "W")}${this.row("Max. Wechselrichterleistung", c.inverterMax, 0, "W")}
+      ${this.row("Akku erlaubt momentan", c.envelope, 0, "W")}${this.row("Effektives Inverter-Limit", c.limit, 0, "W")}${this.row("Max. Wechselrichterleistung", c.inverterMax, 0, "W")}${["unknown", "unavailable", undefined].includes(this.raw(c.backupOut)) ? "" : this.row("Backup-Wechselrichter (nur Anzeige)", c.backupOut, 0, "W")}
       ${this.meter("Progressive Freigabe", c.release)}${this.row("Progressive γ", c.gamma, 2, "")}`, { icon: "⚙️" });
     const full = this.card("FULL · Absorption", `
       ${this.bar("Gesammelte Absorptionszeit", `${this.f(el, 0)} / ${this.f(req, 0)} min`, req ? (el ?? 0) / req * 100 : 0, req && (el ?? 0) >= req ? "ok" : "acc", { e: c.absorptionElapsed })}

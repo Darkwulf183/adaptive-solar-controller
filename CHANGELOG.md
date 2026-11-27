@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.4.9 dev1 (Teststand, nicht veröffentlicht)
+## 0.4.9 dev2 (Teststand, nicht veröffentlicht)
+
+### Neu in dev2
+- **`lead_emergency_days` einstellbar:** Neue Zahl *FULL emergency after days* (9–21 Tage, Standard 10). Nach so vielen Tagen ohne FULL startet die Notfall-FULL-Sperre.
+- **Recorder-Rotation:** Flight-Recorder-Dateien, die älter als 120 Tage sind, werden einmal täglich gelöscht (nur Dateien mit Recorder-Namen, nie die von heute).
+- **Backup-Wechselrichter (EZ1) nur lesen:** Optionales Feld *Backup-Wechselrichter Ausgangsleistung* in der Konfiguration. Der Wert erscheint als Sensor
+  *Backup inverter output*, in der Recorder-Spalte `backup_output_w` und im Panel (Reiter mit den Leistungsgrenzen). ASC regelt oder schützt ihn nicht.
+
+## 0.4.9 dev1
 
 Aus der Notabschaltung vom 27.11.2026 (Recorder 24.–27.11.).
 
