@@ -123,3 +123,23 @@ class FloorGuardTests(unittest.TestCase):
         st, est = make(stored_energy_kwh=5.0, usable_capacity_estimate_kwh=9.5, energy_anchor_seen=True)
         run(est, 120, start=T0, v=22.85, a=-2.2, pv=0.0, out=40.0)
         self.assertGreater(st.stored_energy_kwh, 4.5)
+
+
+class SpreadTolerance(unittest.TestCase):
+    def _q(self, a, spread):
+        st, est = make(stored_energy_kwh=5.0, usable_capacity_estimate_kwh=9.5, energy_anchor_seen=True)
+        est.observe(now=T0, battery_v=23.7, battery_a=a, battery_w=23.7 * a, pv_w=0.0, grid_w=0.0,
+                    inverter_output_w=0.0, hard_low_v=22.8, calibration_enabled=False, measurement_spread_s=spread)
+        return est.observe(now=T0 + timedelta(seconds=10), battery_v=23.7, battery_a=a, battery_w=23.7 * a, pv_w=0.0,
+                           grid_w=0.0, inverter_output_w=0.0, hard_low_v=22.8, calibration_enabled=False,
+                           measurement_spread_s=spread).measurement_quality
+
+    def test_low_current_tolerates_a_long_offset(self):
+        self.assertEqual(self._q(-0.2, 40.0), "synced")
+
+    def test_normal_current_still_needs_a_tight_offset(self):
+        self.assertEqual(self._q(-5.0, 40.0), "degraded")
+        self.assertEqual(self._q(-5.0, 2.0), "synced")
+
+    def test_very_old_offset_is_degraded_even_at_low_current(self):
+        self.assertEqual(self._q(-0.2, 400.0), "degraded")

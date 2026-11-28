@@ -57,6 +57,11 @@ class BatteryEstimator:
     MIN_GAP_KWH = 0.08
     MAX_ENERGY_DT_S = 45.0
     GOOD_MEASUREMENT_SPREAD_S = 5.0
+    # v0.4.9dev3: at (nearly) steady low current a V/I timestamp offset is harmless (error << 1 W h).
+    # The night recorder (28.11.) still showed ~40 % "degraded" with spreads of 10-60 s from sensors that
+    # report on different poll cycles; that blocked the 10-minute plausibility hold overnight.
+    LOW_CURRENT_SPREAD_A = 1.0
+    LOW_CURRENT_SPREAD_S = 120.0
     RELAXED_CURRENT_A = 0.8
     RELAXED_CONFIRM_S = 600.0
     LOW_ANCHOR_MARGIN_V = 0.25
@@ -101,7 +106,8 @@ class BatteryEstimator:
 
         events: list[str] = []
         dt = self._dt(now)
-        quality_ok = measurement_spread_s <= self.GOOD_MEASUREMENT_SPREAD_S and 0.0 <= dt <= self.MAX_ENERGY_DT_S
+        spread_limit = self.LOW_CURRENT_SPREAD_S if abs(battery_a) <= self.LOW_CURRENT_SPREAD_A else self.GOOD_MEASUREMENT_SPREAD_S
+        quality_ok = measurement_spread_s <= spread_limit and 0.0 <= dt <= self.MAX_ENERGY_DT_S
         measurement_quality = "synced" if quality_ok else "degraded"
 
         if self.state.battery_recent_min_v > 60.0:

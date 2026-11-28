@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.4.9 dev2 (Teststand, nicht veröffentlicht)
+## 0.4.9 dev3 (Teststand, nicht veröffentlicht)
+
+- **Messqualität bei kleinem Strom:** Bei |Strom| ≤ 1 A gilt ein Zeitversatz zwischen Spannungs- und Stromsensor bis 120 s als in Ordnung (sonst 5 s).
+  Der Recorder vom 28.11. zeigte nachts weiter ~40 % `degraded` (Versatz 10–60 s, die Sensoren melden in verschiedenen Abfragetakten), dadurch lief die
+  10-Minuten-Plausibilitätsprüfung der Reserve nachts nie und griff erst morgens (Reserve fiel 08:51 binnen 5 min von 56 % auf 40 %).
+
+## 0.4.9 dev2
 
 ### Neu in dev2
 - **`lead_emergency_days` einstellbar:** Neue Zahl *FULL emergency after days* (9–21 Tage, Standard 10). Nach so vielen Tagen ohne FULL startet die Notfall-FULL-Sperre.
